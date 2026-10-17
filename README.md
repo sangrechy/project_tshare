@@ -1,69 +1,35 @@
-# 🚀 Fast File Sharer
+# Combined File Sharing Projects
 
-Fast File Sharer is a simple web application for uploading and downloading files efficiently. It features a clean user interface for seamless file management.
+This repository contains two independent Node.js file sharing applications. Their histories are retained under their own top-level directories, and version numbers are scoped to each project.
 
-## 📂 Directory Structure
-```text
-project_file_sharing_server/
-├── v1/
-│   ├── public/
-│   │   ├── css/
-│   │   │   └── styles.css
-│   │   ├── images/
-│   │   │   ├── ICON.png
-│   │   │   ├── twitter.png
-│   │   │   ├── instagram.png
-│   │   │   └── facebook.png
-│   │   ├── main.html
-│   │   ├── home.html
-│   │   ├── upload.html
-│   │   ├── download.html
-│   │   ├── script.js
-│   │   └── styles.css
-│   ├── uploads/  # (Stores uploaded files)
-│   ├── package.json
-│   ├── package-lock.json
-│   └── server.js
-├── .gitignore
-├── README.md
-└── LICENSE
+## Applications
+
+### File Sharing Server
+
+The upload and download application lives in [`file_sharing_server/`](file_sharing_server/). Its current version is `v1`.
+
+From the repository root:
+
+```sh
+cd file_sharing_server/v1
+npm install
+node server.js
 ```
 
-## 🚀 Features
-- 📤 Upload and manage files easily
-- 📥 Download files seamlessly
+### File Server
 
-## 📋 Requirements:
-- Node.js (https://nodejs.org/)
-- Express.js
-- Multer
+The read-only LAN file browser lives in [`file_server/`](file_server/), with versions `v1` and `v2`.
 
-## 🛠️ Setup & Installation
-1. **Clone the repository**:
-   ```sh
-   git clone https://github.com/sangrechy/project_file_sharing_server.git
-   cd project_file_sharing_server/v1
-   ```
-2. **Install dependencies**:
-   ```sh
-   npm install
-   ```
-3. **Start the server**:
-   ```sh
-   node server.js
-   ```
-4. **Open in browser**:
-   ```
-   http://localhost:3000
-   ```
+From the repository root, choose a version and run:
 
-## 🛡️ Security Considerations
-- Restrict public access to the `/uploads` folder.
-- Implement `express-rate-limit` to prevent spam uploads.
+```sh
+cd file_server/v2
+npm install express multer
+node app.js
+```
 
-## 📜 License
-This project is licensed under the MIT License.
+The application serves files placed in that version's `files/` directory. See each project's README for details and its own setup instructions.
 
----
-🚀 Developed with simplicity and efficiency in mind!
+## License
 
+Both original projects are MIT licensed. Their original license files remain with their respective project directories.
