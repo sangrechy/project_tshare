@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transaction Integrity & Cryptographic Verifier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <polyline points="9 12 11 14 15 10"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="logo-title">TRANSACTION DEEP VERIFIER</h1>
+          <p class="logo-subtitle">Bit-by-Bit Cryptographic Parity & Audit Cockpit • Dark Neumorphic Soft UI</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Live Verifier Status Pill -->
+        <div class="status-pill" id="verifierStatusPill">
+          <span class="status-dot online" id="verifierStatusDot"></span>
+          <span class="status-text" id="verifierStatusText">Auditor Ready</span>
+        </div>
+
+        <button class="btn-nm btn-icon" id="btnCertificate" title="Export HTML Verification Certificate" onclick="exportReport()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </button>
+
+        <button class="btn-nm btn-icon" title="Open Destination Folder" onclick="openDestFolder()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- INVENTORY PARITY OVERVIEW (DUAL WINGS) -->
+    <div class="inventory-grid">
+      <!-- Source Tree Wing -->
+      <div class="nm-card tree-card source-tree">
+        <div class="tree-card-header">
+          <span class="tree-badge source-badge">SOURCE INVENTORY</span>
+          <span class="tree-path" id="srcPathDisplay">\\192.168.1.X\SharedFolder</span>
+        </div>
+        <div class="tree-metrics">
+          <div class="tree-stat">
+            <span class="stat-num" id="srcFilesDisplay">—</span>
+            <span class="stat-lbl">Indexed Files</span>
+          </div>
+          <div class="tree-stat">
+            <span class="stat-num" id="srcBytesDisplay">—</span>
+            <span class="stat-lbl">Total Volume</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center Parity Shield -->
+      <div class="center-shield">
+        <div class="shield-circle">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="shield-icon">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <span class="shield-label">PARITY CHECK</span>
+      </div>
+
+      <!-- Destination Tree Wing -->
+      <div class="nm-card tree-card dest-tree">
+        <div class="tree-card-header">
+          <span class="tree-badge dest-badge">DESTINATION INVENTORY</span>
+          <span class="tree-path" id="dstPathDisplay">D:\Transfer</span>
+        </div>
+        <div class="tree-metrics">
+          <div class="tree-stat">
+            <span class="stat-num stat-dest" id="dstFilesDisplay">—</span>
+            <span class="stat-lbl">Target Files</span>
+          </div>
+          <div class="tree-stat">
+            <span class="stat-num stat-dest" id="dstBytesDisplay">—</span>
+            <span class="stat-lbl">Target Volume</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VERIFICATION CONTROLS & MODE SELECTOR -->
+    <div class="nm-card mode-card">
+      <div class="mode-header">
+        <div>
+          <h2 class="section-title">Select Audit Verification Rigor</h2>
+          <p class="section-desc">Choose between ultra-fast metadata parity, smart block sampling, or full cryptographic SHA-256 bit-by-bit check.</p>
+        </div>
+        <!-- Thread control -->
+        <div class="thread-selector">
+          <span class="thread-lbl">Workers:</span>
+          <div class="segmented-control">
+            <button class="segment-btn" onclick="setWorkers(2)" id="w2">2</button>
+            <button class="segment-btn active" onclick="setWorkers(4)" id="w4">4</button>
+            <button class="segment-btn" onclick="setWorkers(8)" id="w8">8</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mode-cards-grid">
+        <!-- Mode 1: Metadata & Size Parity -->
+        <div class="nm-card mode-choice-card active" id="modeCardMetadata" onclick="selectMode('metadata')">
+          <div class="mode-choice-header">
+            <div class="mode-dot"></div>
+            <span class="mode-name">Fast Parity Audit</span>
+          </div>
+          <p class="mode-desc">Verifies relative paths, exact byte sizes down to the byte, and file modification timestamps across all files. (Completes in seconds).</p>
+        </div>
+
+        <!-- Mode 2: Smart Block Checksum -->
+        <div class="nm-card mode-choice-card" id="modeCardSmart" onclick="selectMode('smart')">
+          <div class="mode-choice-header">
+            <div class="mode-dot"></div>
+            <span class="mode-name">Smart Block Checksum</span>
+          </div>
+          <p class="mode-desc">Hashes Header (1MB), Middle (1MB), and Footer (1MB) blocks with SHA-256. Perfect for multi-gigabyte media verification.</p>
+        </div>
+
+        <!-- Mode 3: Full Bit-by-Bit SHA-256 -->
+        <div class="nm-card mode-choice-card" id="modeCardFull" onclick="selectMode('full_sha256')">
+          <div class="mode-choice-header">
+            <div class="mode-dot"></div>
+            <span class="mode-name">Full Cryptographic SHA-256</span>
+          </div>
+          <p class="mode-desc">Full 100% bit-by-bit SHA-256 hashing across all volume data. Mathematically guarantees zero bit rot or silent data corruption.</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div class="verify-action-row">
+        <button class="btn-nm btn-primary" id="btnStartVerify" onclick="startVerification()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span id="btnStartVerifyLabel">Start Deep Verification</span>
+        </button>
+
+        <button class="btn-nm btn-danger" id="btnStopVerify" onclick="stopVerification()" disabled>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          <span>Stop Audit</span>
+        </button>
+
+        <button class="btn-nm" onclick="exportReport()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span>Export Audit Certificate</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TELEMETRY DIALS & ESTIMATION TIME (ETA) -->
+    <div class="nm-card telemetry-card">
+      <div class="dials-grid">
+        
+        <!-- Dial 1: Total Progress -->
+        <div class="dial-item">
+          <div class="dial-circle-outer">
+            <svg class="progress-ring" width="108" height="108">
+              <circle class="progress-ring-bg" stroke-width="7" cx="54" cy="54" r="46"></circle>
+              <circle class="progress-ring-fill" id="progressRingFill" stroke-width="7" cx="54" cy="54" r="46"></circle>
+            </svg>
+            <div class="dial-inner">
+              <span class="dial-value" id="progressPercentValue">0%</span>
+              <span class="dial-sub">Verified</span>
+            </div>
+          </div>
+          <div class="dial-caption">Audit Progress</div>
+          <div class="dial-subcaption" id="progressBytesCaption">0 B / 0 B</div>
+        </div>
+
+        <!-- Dial 2: Hashing Speed -->
+        <div class="dial-item">
+          <div class="dial-circle-outer speed-circle">
+            <div class="dial-inner">
+              <span class="dial-value speed-val" id="hashingSpeedValue">0 B/s</span>
+              <!-- Equalizer animation -->
+              <div class="eq-container" id="verifyEqualizer">
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="dial-caption">Hashing Speed</div>
+          <div class="dial-subcaption" id="speedCaption">Idle</div>
+        </div>
+
+        <!-- Dial 3: PROMINENT ESTIMATION TIME (ETA) -->
+        <div class="dial-item eta-item">
+          <div class="dial-circle-outer eta-circle">
+            <div class="dial-inner eta-inner">
+              <div class="eta-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <span class="dial-value eta-val" id="etaDisplayValue">—</span>
+              <span class="dial-sub">Est. Remaining</span>
+            </div>
+          </div>
+          <div class="dial-caption eta-caption">Estimation Time (ETA)</div>
+          <div class="dial-subcaption" id="elapsedCaption">Elapsed: 00:00:00</div>
+        </div>
+
+        <!-- Dial 4: Parity Ledger Matches -->
+        <div class="dial-item">
+          <div class="dial-circle-outer">
+            <div class="dial-inner">
+              <span class="dial-value match-val" id="matchedCountValue">0</span>
+              <span class="dial-sub" id="discrepancySub">0 Mismatches</span>
+            </div>
+          </div>
+          <div class="dial-caption">Verified Valid</div>
+          <div class="dial-subcaption" id="missingSub">0 Missing</div>
+        </div>
+
+      </div>
+
+      <!-- Main Progress Bar -->
+      <div class="slider-track" id="mainProgressTrack">
+        <div class="slider-fill" id="mainProgressFill" style="width: 0%;"></div>
+        <div class="slider-thumb" id="mainProgressThumb" style="left: 0%;"></div>
+      </div>
+
+      <!-- Active File Recessed Banner -->
+      <div class="recessed-file-banner">
+        <span class="file-banner-tag">CURRENT AUDIT FILE</span>
+        <span class="file-banner-name" id="currentFileDisplay">Ready (Click Start Deep Verification)</span>
+      </div>
+    </div>
+
+    <!-- VERIFIED FILE LEDGER AUDIT TABLE -->
+    <div class="nm-card ledger-card">
+      <div class="ledger-header">
+        <div class="ledger-title-group">
+          <span class="ledger-title">Cryptographic File Audit Ledger</span>
+          <span class="ledger-badge" id="ledgerCountBadge">0 verified</span>
+        </div>
+
+        <div class="ledger-actions">
+          <input type="text" class="search-input" id="searchInput" placeholder="Search file name or path…" oninput="filterLedger()">
+          <div class="log-filter-group">
+            <button class="filter-btn active" onclick="setFilter('all')" id="fltAll">All</button>
+            <button class="filter-btn" onclick="setFilter('ok')" id="fltOk">Verified OK</button>
+            <button class="filter-btn" onclick="setFilter('err')" id="fltErr">Discrepancies</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table View -->
+      <div class="table-scroll-container">
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th style="width: 45%;">Relative File Path</th>
+              <th style="width: 15%;">Size</th>
+              <th style="width: 20%;">Integrity Status</th>
+              <th style="width: 20%;">Checksum / Footprint</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerTableBody">
+            <tr>
+              <td colspan="4" class="empty-cell">Click "Start Deep Verification" above to begin auditing files…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RECESSED STREAM CONSOLE -->
+    <div class="nm-card terminal-card">
+      <div class="terminal-header">
+        <span class="terminal-title">Verification Event Stream</span>
+        <button class="btn-nm btn-tiny" onclick="clearLogs()">Clear</button>
+      </div>
+      <div class="recessed-terminal" id="terminalOutput">
+        <div class="log-entry info"><span class="log-time">[Init]</span> Deep Transaction Verifier ready. Select audit mode and click Start to begin.</div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span>Transaction Integrity Verifier • Dark Neumorphic Soft UI</span>
+      <span>Cryptographic Audit Proof • SHA-256 Engine</span>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

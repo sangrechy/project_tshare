@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Local storage and user-transferred content
+uploads/*
+!uploads/.gitkeep
+files/*
+!files/.gitkeep
+
+# Large media files
+*.mp4
+*.mkv
+*.avi
+*.zip
+*.tar.gz
+
+# Logs and runtime states
+*.log
+npm-debug.log*
+*.json.state
+*.cert
+
+# Environment & OS files
+.env
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Local runtime logs and state
+*.log
+*.json
+*.cert
+*.html.cert
+
+# OS files
+.DS_Store
+Thumbs.db

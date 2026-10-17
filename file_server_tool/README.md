@@ -1,124 +1,98 @@
-# 📁 FileCloud — Simple File Sharing Server
+# 📁 FileCloud — LAN File Browser & Server
 
-FileCloud is a simple file-sharing server built with **Node.js and Express**. It allows devices on the same network to browse folders and download files through a web browser.
+FileCloud is a simple, lightweight file-sharing server built with **Node.js and Express**. It allows devices on the same network (Wi-Fi or Ethernet LAN) to browse folders and download files through any modern web browser.
 
 ## ✨ Features
 
-* Browse folders and files
-* Download files
-* Breadcrumb navigation
-* Simple dark-mode interface
-* Secure file path handling
-* Works on Wi-Fi or Ethernet LAN
+* **Folder & File Browsing:** Traverse directories with real-time breadcrumb navigation.
+* **Direct File Downloads:** Fast downloads for all file types.
+* **Modern Web Interface:** Clean dark-mode interface with mobile and desktop responsive views.
+* **Safe Path Resolution:** Secure path validation to prevent directory traversal outside the shared root.
+* **LAN Auto-Discovery (v2):** Automatically detects and prints active local IPv4 addresses for one-click access from phones, tablets, and laptops.
 
 ## 🛠️ Requirements
 
-* [Node.js](https://nodejs.org/) LTS
-* A browser
+* [Node.js](https://nodejs.org/) (v16+ recommended)
+* Any modern web browser
 
-## 📥 Installation
+## 📥 Setup & Usage
 
-### 1. Clone the repository
+### 1. Navigate to the desired version directory
+
+From the `project_tshare` root:
 
 ```bash
-git clone https://github.com/sangrechy/project_file_server.git
-cd project_file_server/v2   # or v1 for earlier iteration
+# Version 2 (Recommended - auto-detects LAN IP with modern dark UI)
+cd file_server_tool/v2
+
+# Version 1 (Classic lightweight baseline)
+cd file_server_tool/v1
 ```
 
 ### 2. Install dependencies
 
 ```bash
-npm install
+npm install express
 ```
 
-If dependencies are not already listed in `package.json`, install them with:
+### 3. Place files to share
 
-```bash
-npm install express multer
-```
-
-> `path`, `fs`, and `os` are built-in Node.js modules.
-
-### 3. Create the shared folder
-
-Create a `files` folder inside the version directory (`v2` or `v1`):
+Create a `files` folder in the version directory (if not already present) and place any files or folders you want to share:
 
 ```bash
 mkdir files
 ```
 
-Put the files you want to share inside this folder.
-
-## ▶️ Start the Server
-
-Run (from the version directory, e.g. `v2/`):
+### 4. Start the server
 
 ```bash
 node app.js
 ```
 
-The server will display an address such as:
+The server will bind to port `3000` and display your LAN access URLs, for example:
 
 ```text
-File manager running at http://192.168.1.5:3000
+File manager running at http://localhost:3000
+File manager running at http://192.168.1.X:3000
 ```
 
-Open this address in a browser on any device connected to the same network.
+Open the displayed address on any client device on your local network.
 
-Example:
-
-```text
-http://192.168.1.5:3000
-```
-
-## 📁 Project Structure
+## 📁 Directory Structure
 
 ```text
-project_file_server/
-├── v1/
-│   ├── app.js
-│   ├── public/
-│   │   ├── index.html
-│   │   ├── script.js
-│   │   └── styles.css
-│   └── files/
-├── v2/
-│   ├── app.js
-│   ├── public/
-│   │   ├── index.html
-│   │   ├── script.js
-│   │   └── styles.css
-│   └── files/
+file_server_tool/
 ├── .gitignore
 ├── README.md
-└── LICENSE
+├── v1/
+│   ├── app.js
+│   ├── files/          # User-shared content (gitignored)
+│   └── public/
+│       ├── index.html
+│       ├── script.js
+│       └── styles.css
+└── v2/
+    ├── app.js
+    ├── files/          # User-shared content (gitignored)
+    └── public/
+        ├── index.html
+        ├── script.js
+        └── styles.css
 ```
 
 ### 📌 Version Breakdown
-* **v1:** Initial simple file-sharing server with basic UI.
-* **v2:** Enhanced modern UI and automatic local IPv4 interface detection for instant LAN access.
+* **v1:** Minimal file-sharing server with basic table UI.
+* **v2:** Enhanced UI, breadcrumbs, search, and automatic IPv4 network interface detection.
 
-## 🌐 External Access
+## 🌐 External Access (Optional)
 
-You can use **ngrok** to access the server from outside your local network.
+To access your file server outside your local network, you can tunnel through tools like **ngrok**:
 
 ```bash
 ngrok http 3000
 ```
 
-Ngrok will provide a public URL that can be opened from another network.
+## 🔐 Security Considerations
 
-## 🔐 Security
-
-* Only files inside the `files` directory are accessible.
-* The server is read-only.
-* Files cannot be deleted or modified through the web interface.
-* File uploads are not enabled by default.
-
-## 📜 License
-
-This project is licensed under the **MIT License**.
-
-## 🔗 Repository
-
-https://github.com/sangrechy/project_file_server
+* Only files inside the designated `files/` directory are accessible.
+* The server operates in read-only mode by default; files cannot be modified or deleted through the web UI.

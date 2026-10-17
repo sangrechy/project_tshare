@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ethernet File Transfer • Dual-Deck Robocopy Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="logo-title">Ethernet Transfer <span class="arrow-accent">⇄</span> Cockpit</h1>
+          <p class="logo-subtitle">Dual-Deck Robocopy Cockpit • Dark Neumorphic Soft UI</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- SMB Latency Badge -->
+        <div class="latency-badge" id="latencyBadge" title="Round-trip TCP latency to SMB share">
+          <span class="latency-bolt">⚡</span>
+          <span id="latencyText">SMB Latency: …</span>
+        </div>
+
+        <!-- Live System Status Pill -->
+        <div class="status-pill" id="systemStatusPill">
+          <span class="status-dot" id="systemStatusDot"></span>
+          <span class="status-text" id="systemStatusText">Checking system…</span>
+        </div>
+
+        <!-- Quick Folder Access Buttons -->
+        <button class="btn-nm btn-icon" id="btnOpenDest" title="Open Destination Folder in Explorer" onclick="openDestFolder()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="btn-nm btn-icon" id="btnOpenSource" title="Open Source Share in Explorer" onclick="openSourceFolder()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        </button>
+        <button class="btn-nm btn-icon" id="btnRescanHeader" title="Rescan Folders & Check Space" onclick="triggerScan()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- DUAL-DECK SPLIT ARCHITECTURE WITH CONNECTING PIPELINE -->
+    <div class="dual-deck-layout">
+      
+      <!-- ==================== LEFT DECK: SOURCE SYSTEM ==================== -->
+      <div class="nm-card deck-card source-deck">
+        <div class="deck-header">
+          <div class="deck-title-group">
+            <span class="deck-pill deck-pill-source">SOURCE SYSTEM</span>
+            <span class="deck-sub-title">SMB Network NAS</span>
+          </div>
+          <div class="badge-status">
+            <span class="status-dot dot-sm" id="sourceDot"></span>
+            <span id="sourceStatusText">Checking</span>
+          </div>
+        </div>
+
+        <div class="path-box">
+          <span class="path-text" id="sourcePathDisplay">\\192.168.1.X\SharedFolder</span>
+        </div>
+
+        <!-- Dedicated Source Speed Dial & Equalizer -->
+        <div class="speed-dial-box">
+          <div class="dial-circle-outer source-circle">
+            <div class="dial-inner source-inner">
+              <span class="flow-icon flow-upload">↑</span>
+              <span class="dial-value upload-val" id="sourceUploadSpeed">0 B/s</span>
+              <span class="dial-sub">Upload / Read</span>
+            </div>
+          </div>
+          <!-- Upload Animated Equalizer -->
+          <div class="eq-container eq-source" id="sourceEqualizer">
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+          </div>
+          <div class="rate-caption">Network Outflow Rate</div>
+        </div>
+
+        <!-- Source Metrics Grid -->
+        <div class="deck-metrics-grid">
+          <div class="metric-cell">
+            <span class="metric-label">Share Capacity</span>
+            <span class="metric-val" id="sourceCapacityText">—</span>
+            <div class="mini-track">
+              <div class="mini-fill fill-source" id="sourceCapacityFill" style="width: 0%;"></div>
+            </div>
+            <span class="metric-sub" id="sourceUsedText">Used: —</span>
+          </div>
+
+          <div class="metric-cell">
+            <span class="metric-label">Source Files</span>
+            <span class="metric-val" id="sourceFilesCount">0</span>
+            <span class="metric-sub" id="sourceTotalBytes">0 B total</span>
+          </div>
+        </div>
+
+        <!-- Active Source Directory Banner -->
+        <div class="recessed-stream-tag">
+          <span class="tag-title">READING FOLDER</span>
+          <span class="tag-content" id="activeFolderDisplay">Source</span>
+        </div>
+
+        <button class="btn-nm btn-deck-action" onclick="openSourceFolder()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Explore Source Share</span>
+        </button>
+      </div>
+
+
+      <!-- ==================== CENTER NEXUS: DATA PIPELINE & ETA ==================== -->
+      <div class="center-nexus">
+        
+        <!-- Live Animated Flow Stream -->
+        <div class="flow-pipeline" id="flowPipeline">
+          <div class="particle p1"></div>
+          <div class="particle p2"></div>
+          <div class="particle p3"></div>
+          <div class="pipeline-line"></div>
+        </div>
+
+        <!-- Center Main Progress Dial -->
+        <div class="nexus-progress-card">
+          <div class="dial-circle-outer center-circle">
+            <svg class="progress-ring" width="118" height="118">
+              <circle class="progress-ring-bg" stroke-width="8" cx="59" cy="59" r="50"></circle>
+              <circle class="progress-ring-fill" id="progressRingFill" stroke-width="8" cx="59" cy="59" r="50"></circle>
+            </svg>
+            <div class="dial-inner center-inner">
+              <span class="dial-value center-pct" id="progressPercentValue">0%</span>
+              <span class="dial-sub">Progress</span>
+            </div>
+          </div>
+          <div class="progress-bytes-label" id="progressBytesCaption">0 B / 0 B</div>
+        </div>
+
+        <!-- PROMINENT ESTIMATED TIME (ETA) CARD -->
+        <div class="eta-nexus-card">
+          <div class="eta-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="eta-clock-icon">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="eta-title">ESTIMATION TIME</span>
+          </div>
+          <div class="eta-huge-val" id="etaDisplayValue">—</div>
+          <div class="eta-elapsed-sub" id="elapsedCaption">Elapsed: 00:00:00</div>
+        </div>
+
+        <div class="nexus-files-badge">
+          <span class="files-copied-num" id="filesCountValue">0</span>
+          <span class="files-of-total" id="filesTotalSub">of 0 files</span>
+        </div>
+      </div>
+
+
+      <!-- ==================== RIGHT DECK: DESTINATION SYSTEM ==================== -->
+      <div class="nm-card deck-card dest-deck">
+        <div class="deck-header">
+          <div class="deck-title-group">
+            <span class="deck-pill deck-pill-dest">DESTINATION SYSTEM</span>
+            <span class="deck-sub-title">Local NVMe / Volume D:</span>
+          </div>
+          <div class="badge-status">
+            <span class="status-dot dot-sm" id="destDot"></span>
+            <span id="destStatusText">Checking</span>
+          </div>
+        </div>
+
+        <div class="path-box">
+          <span class="path-text" id="destPathDisplay">D:\Transfer</span>
+        </div>
+
+        <!-- Dedicated Destination Speed Dial & Equalizer -->
+        <div class="speed-dial-box">
+          <div class="dial-circle-outer dest-circle">
+            <div class="dial-inner dest-inner">
+              <span class="flow-icon flow-download">↓</span>
+              <span class="dial-value download-val" id="destDownloadSpeed">0 B/s</span>
+              <span class="dial-sub">Download / Write</span>
+            </div>
+          </div>
+          <!-- Download Animated Equalizer -->
+          <div class="eq-container eq-dest" id="destEqualizer">
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+          </div>
+          <div class="rate-caption">Disk Write Inflow Rate</div>
+        </div>
+
+        <!-- Destination Metrics Grid -->
+        <div class="deck-metrics-grid">
+          <div class="metric-cell">
+            <span class="metric-label">Target Free Space</span>
+            <span class="metric-val metric-free" id="destFreeText">—</span>
+            <div class="mini-track">
+              <div class="mini-fill fill-dest" id="destCapacityFill" style="width: 0%;"></div>
+            </div>
+            <span class="metric-sub" id="destTotalText">Total: —</span>
+          </div>
+
+          <div class="metric-cell">
+            <span class="metric-label">Files Committed</span>
+            <span class="metric-val" id="destFilesCount">0</span>
+            <span class="metric-sub" id="destHeadroomText">Headroom: Safe</span>
+          </div>
+        </div>
+
+        <!-- Active Destination Writing File Banner -->
+        <div class="recessed-stream-tag">
+          <span class="tag-title tag-dest">WRITING FILE</span>
+          <span class="tag-content" id="activeFileDisplay">Waiting for transfer…</span>
+        </div>
+
+        <button class="btn-nm btn-deck-action" onclick="openDestFolder()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Open Destination Folder</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- MAIN PROGRESS BAR (RECESSED CHANNEL) -->
+    <div class="nm-card progress-banner-card">
+      <div class="slider-track" id="mainProgressTrack">
+        <div class="slider-fill" id="mainProgressFill" style="width: 0%;"></div>
+        <div class="slider-thumb" id="mainProgressThumb" style="left: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- DUAL REAL-TIME SPEED SPARKLINE CHART (ADDED COOL COMPONENT) -->
+    <div class="nm-card chart-card">
+      <div class="chart-header">
+        <div class="chart-title-group">
+          <span class="chart-title">Real-Time Throughput Telemetry</span>
+          <span class="chart-legend">
+            <span class="legend-dot dot-upload"></span> Source Upload (MB/s)
+            <span class="legend-dot dot-download"></span> Destination Write (MB/s)
+          </span>
+        </div>
+        <span class="chart-unit" id="peakSpeedLabel">Peak: 0 MB/s</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="speedCanvas" width="940" height="90"></canvas>
+      </div>
+    </div>
+
+    <!-- SAFE RESUME CONTROL HUB -->
+    <div class="nm-card control-hub">
+      <div class="control-hub-header">
+        <div>
+          <h2 class="section-title">Safe Resume Engine Hub</h2>
+          <p class="section-desc">Robocopy runs with <strong>/E /Z /J /XO</strong>. Existing files on destination target are never deleted or mirrored.</p>
+        </div>
+        <button class="btn-nm btn-small-settings" onclick="toggleSettingsDrawer()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span id="settingsToggleLabel">Transfer Flags</span>
+        </button>
+      </div>
+
+      <!-- Confirmation Toggle Switch -->
+      <div class="confirm-row">
+        <div class="switch-nm" id="confirmSwitch" onclick="toggleConfirmSwitch()">
+          <div class="switch-handle"></div>
+        </div>
+        <div class="confirm-label-group" onclick="toggleConfirmSwitch()">
+          <span class="confirm-title">I confirmed the previous Robocopy transfer has finished or was stopped</span>
+          <span class="confirm-sub">Protects against running duplicate concurrent Robocopy sessions that could cause I/O lockups.</span>
+        </div>
+      </div>
+
+      <!-- Primary Action Buttons Row -->
+      <div class="actions-row">
+        <button class="btn-nm btn-primary" id="btnResume" onclick="startResumeTransfer()" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <span id="btnResumeLabel">Resume Copy</span>
+        </button>
+
+        <button class="btn-nm btn-danger" id="btnStop" onclick="stopTransfer()" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="2"/>
+          </svg>
+          <span>Stop Copy</span>
+        </button>
+
+        <button class="btn-nm" id="btnRefresh" onclick="triggerScan()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          <span>Scan / Refresh</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Advanced Settings -->
+      <div class="settings-drawer" id="settingsDrawer">
+        <div class="drawer-inner">
+          <div class="setting-option">
+            <label>Multi-threading (/MT)</label>
+            <div class="segmented-control">
+              <button class="segment-btn" onclick="setThreads(4)" id="mt4">4</button>
+              <button class="segment-btn active" onclick="setThreads(8)" id="mt8">8</button>
+              <button class="segment-btn" onclick="setThreads(16)" id="mt16">16</button>
+              <button class="segment-btn" onclick="setThreads(32)" id="mt32">32</button>
+            </div>
+          </div>
+          <div class="setting-option">
+            <label>Restartable Mode (/Z)</label>
+            <div class="switch-nm small-switch checked" id="switchZ" onclick="toggleOption('restartable', this)">
+              <div class="switch-handle"></div>
+            </div>
+          </div>
+          <div class="setting-option">
+            <label>Unbuffered I/O (/J)</label>
+            <div class="switch-nm small-switch checked" id="switchJ" onclick="toggleOption('unbuffered', this)">
+              <div class="switch-handle"></div>
+            </div>
+          </div>
+          <div class="setting-option">
+            <label>Exclude Older Files (/XO)</label>
+            <div class="switch-nm small-switch checked" id="switchXO" onclick="toggleOption('exclude_older', this)">
+              <div class="switch-handle"></div>
+            </div>
+          </div>
+          <div class="setting-option">
+            <label>Exclude $RECYCLE.BIN (/XD)</label>
+            <div class="switch-nm small-switch checked" id="switchXD" onclick="toggleOption('exclude_system', this)">
+              <div class="switch-handle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TACTILE RECESSED TERMINAL / REAL-TIME STREAM LOG -->
+    <div class="nm-card terminal-card">
+      <div class="terminal-header">
+        <div class="terminal-title-group">
+          <span class="terminal-title">Robocopy Stream Console</span>
+          <span class="terminal-badge" id="logCountBadge">0 events</span>
+        </div>
+
+        <div class="terminal-actions">
+          <div class="log-filter-group">
+            <button class="filter-btn active" onclick="setLogFilter('all')" id="filterAll">All</button>
+            <button class="filter-btn" onclick="setLogFilter('file')" id="filterFiles">Files</button>
+            <button class="filter-btn" onclick="setLogFilter('error')" id="filterErrors">Errors</button>
+          </div>
+          <button class="btn-nm btn-tiny" onclick="clearTerminalLogs()" title="Clear console output">Clear</button>
+          <button class="btn-nm btn-tiny" id="btnAutoScroll" onclick="toggleAutoScroll()" title="Toggle auto scroll">Auto-scroll: ON</button>
+        </div>
+      </div>
+
+      <!-- Inset Recessed Log Display -->
+      <div class="recessed-terminal" id="terminalOutput">
+        <div class="log-entry info"><span class="log-time">[Init]</span> Dual-deck transfer monitor initialized. Theme: Neumorphism Soft UI (Dark).</div>
+        <div class="log-entry info"><span class="log-time">[Mode]</span> Safe resume configured: Robocopy /E /Z /J /XO. No destination delete/mirror enabled.</div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <span>Dual-Deck Ethernet Transfer Cockpit • Tactile Soft UI Engine</span>
+      <span>Windows Process Identity Verification & Kernel I/O Counters Active</span>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
