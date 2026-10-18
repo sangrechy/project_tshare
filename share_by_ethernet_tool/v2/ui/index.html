@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ethernet File Transfer & Deep Verification Suite v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- ==================== HEADER ==================== -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="logo-title">Ethernet Transfer <span class="arrow-accent">⇄</span> Audit Suite</h1>
+          <p class="logo-subtitle">v2.0 Unified Robocopy Cockpit & Cryptographic Verifier • Dark Neumorphic Soft UI</p>
+        </div>
+      </div>
+
+      <!-- TACTILE TOP NAVIGATION -->
+      <nav class="header-nav">
+        <button class="nav-tab-btn active" id="tabBtnHome" onclick="switchTab('home')">
+          <span>☖</span> Home
+        </button>
+        <button class="nav-tab-btn" id="tabBtnSend" onclick="switchTab('send')">
+          <span>↑</span> Send Deck
+        </button>
+        <button class="nav-tab-btn" id="tabBtnReceive" onclick="switchTab('receive')">
+          <span>↓</span> Receive Deck
+        </button>
+        <button class="nav-tab-btn" id="tabBtnVerify" onclick="switchTab('verify')">
+          <span>🛡</span> Deep Verifier
+        </button>
+        <button class="nav-tab-btn" id="tabBtnHistory" onclick="switchTab('history')">
+          <span>⏱</span> History
+        </button>
+      </nav>
+
+      <div class="header-right">
+        <!-- SMB Latency Badge -->
+        <div class="latency-badge" id="latencyBadge" title="Round-trip TCP latency to destination">
+          <span class="latency-bolt">⚡</span>
+          <span id="latencyText">SMB: Idle</span>
+        </div>
+
+        <!-- Live System Status Pill -->
+        <div class="status-pill" id="systemStatusPill">
+          <span class="status-dot online" id="systemStatusDot"></span>
+          <span class="status-text" id="systemStatusText">Cockpit Ready</span>
+        </div>
+
+        <!-- Quick Folder Buttons -->
+        <button class="btn-nm btn-icon" title="Open Destination Folder" onclick="openCurrentDest()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="btn-nm btn-icon" title="Refresh System Telemetry" onclick="refreshSystemOverview()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
+      </div>
+    </header>
+
+
+    <!-- ========================================================
+         VIEW 1: HOME DASHBOARD
+         ======================================================== -->
+    <main class="tab-view active" id="viewHome">
+      
+      <!-- Active Transfer Mini-Card -->
+      <div class="home-active-banner" id="homeActiveBanner" style="display: none;">
+        <div>
+          <div style="font-size: 0.7rem; font-weight: 700; color: var(--source-light); letter-spacing: 0.06em;">ACTIVE ROBOCOPY TRANSFER</div>
+          <div style="font-size: 1.05rem; font-weight: 700; margin-top: 2px;" id="homeActiveFolder">Copying Data...</div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace;" id="homeActiveFile">—</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.35rem; font-weight: 700; color: var(--dest-light); font-family: 'JetBrains Mono', monospace;" id="homeActiveSpeed">0 MB/s</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);" id="homeActiveEta">ETA: --:--:--</div>
+        </div>
+        <div>
+          <button class="btn-nm btn-primary" onclick="switchTab('send')">Open Transfer Deck ➔</button>
+        </div>
+      </div>
+
+      <!-- System Overview Top Grid -->
+      <div class="home-grid-top">
+        
+        <!-- Network Adapters Card -->
+        <div class="nm-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+            <div style="font-size: 0.95rem; font-weight: 700;">⚡ Network Adapters & Link Speeds</div>
+            <button class="btn-nm btn-xs" onclick="refreshSystemOverview()">↻ Refresh</button>
+          </div>
+
+          <div class="host-pills-row">
+            <div class="host-pill">HOSTNAME: <strong id="homeHostName">Sangrechy</strong></div>
+            <div class="host-pill">PRIMARY IP: <strong id="homeHostIp">127.0.0.1</strong></div>
+            <div class="host-pill">USER: <strong id="homeHostUser">User</strong></div>
+          </div>
+
+          <div class="adapter-scroll" id="homeAdapterList">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center; padding: 1rem;">Scanning adapters…</div>
+          </div>
+        </div>
+
+        <!-- Local Drive Capacity Card -->
+        <div class="nm-card">
+          <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.85rem;">💾 Local Storage Capacities</div>
+          <div class="drive-meters-col" id="homeDriveList">
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center; padding: 1rem;">Scanning drives…</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Quick Action Launchpads -->
+      <div class="launchpad-grid">
+        <div class="launch-card" onclick="switchTab('send')">
+          <div class="launch-icon" style="color: var(--source-light);">↑</div>
+          <div class="launch-title">Send Files (Robocopy Deck)</div>
+          <div class="launch-desc">High-speed multi-threaded Robocopy with safe resume (/Z), unbuffered I/O (/J), dual speed dials, and live canvas sparklines.</div>
+          <div class="launch-link">Open Sender Deck ➔</div>
+        </div>
+
+        <div class="launch-card" onclick="switchTab('receive')">
+          <div class="launch-icon" style="color: var(--dest-light);">↓</div>
+          <div class="launch-title">Receive Files & Share Assist</div>
+          <div class="launch-desc">View your computer's IP & Hostname UNC paths with 1-click copy, configure Windows SMB sharing, and monitor incoming files live.</div>
+          <div class="launch-link">Open Receiver Deck ➔</div>
+        </div>
+
+        <div class="launch-card" onclick="switchTab('verify')">
+          <div class="launch-icon" style="color: var(--success);">🛡</div>
+          <div class="launch-title">Deep Integrity Verifier</div>
+          <div class="launch-desc">Cross-audit or single-tree audit with Fast Parity, Smart Block Checksums, or Full SHA-256 Bit-by-Bit checks and HTML certificates.</div>
+          <div class="launch-link">Start Deep Audit ➔</div>
+        </div>
+
+        <div class="launch-card" onclick="switchTab('history')">
+          <div class="launch-icon" style="color: #fbbf24;">⏱</div>
+          <div class="launch-title">Transfer History Ledger</div>
+          <div class="launch-desc">Persistent SQLite database of past transfers and verifications with 1-click Re-Verify and instant destination folder opening.</div>
+          <div class="launch-link">Browse History ➔</div>
+        </div>
+      </div>
+
+      <!-- Lifetime Stats Counter Strip -->
+      <div class="lifetime-stats-strip">
+        <div class="life-stat-box">
+          <div class="life-stat-val" id="homeStatTransfers">0</div>
+          <div class="life-stat-lbl">Transfers Completed</div>
+        </div>
+        <div class="life-stat-box">
+          <div class="life-stat-val" id="homeStatBytes">0 B</div>
+          <div class="life-stat-lbl">Total Data Transferred</div>
+        </div>
+        <div class="life-stat-box">
+          <div class="life-stat-val" id="homeStatPeakSpeed">0 MB/s</div>
+          <div class="life-stat-lbl">Peak Transfer Speed</div>
+        </div>
+        <div class="life-stat-box">
+          <div class="life-stat-val" id="homeStatAudits">0</div>
+          <div class="life-stat-lbl">Integrity Audits Run</div>
+        </div>
+        <div class="life-stat-box">
+          <div class="life-stat-val" id="homeStatFilesAudited">0</div>
+          <div class="life-stat-lbl">Verified 100% Matches</div>
+        </div>
+      </div>
+
+    </main>
+
+
+    <!-- ========================================================
+         VIEW 2: SEND (DUAL-DECK ROBOCOPY COCKPIT)
+         ======================================================== -->
+    <main class="tab-view" id="viewSend">
+      
+      <!-- Path Controls & Tuning Bar -->
+      <div class="nm-card send-path-panel">
+        <div class="send-path-grid">
+          
+          <div class="path-input-col">
+            <div class="path-lbl">
+              <span>SOURCE DIRECTORY (Local or Share)</span>
+              <span id="sendSourceCountLabel">0 files scanned</span>
+            </div>
+            <div class="input-with-btn">
+              <input type="text" id="sendSourceInput" class="input-nm" placeholder="E:\Data\TransferFolder">
+              <button class="btn-nm btn-sm" onclick="browseFolder('sendSourceInput')">📁 Browse</button>
+            </div>
+          </div>
+
+          <div class="path-input-col">
+            <div class="path-lbl">
+              <span>DESTINATION DIRECTORY (Ethernet Share / Drive)</span>
+              <span id="sendDestPingLabel" style="color: #fbbf24;">⚡ Ping: Ready</span>
+            </div>
+            <div class="input-with-btn">
+              <input type="text" id="sendDestInput" class="input-nm" placeholder="\\192.168.1.50\Transfers or D:\Transfer">
+              <button class="btn-nm btn-sm" onclick="browseFolder('sendDestInput')">📁 Browse</button>
+              <button class="btn-nm btn-sm" onclick="testSendLatency()" title="Test SMB Roundtrip Ping">⚡ Ping</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Robocopy Tuning & Actions -->
+        <div class="send-tuning-row">
+          <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="font-size: 0.78rem; color: var(--text-secondary);">Threads (/MT):</span>
+              <select id="sendThreadsSelect" class="select-nm">
+                <option value="4">4 Threads</option>
+                <option value="8" selected>8 Threads (Default)</option>
+                <option value="16">16 Threads (Fast)</option>
+                <option value="32">32 Threads (Gigabit)</option>
+                <option value="64">64 Threads (Extreme)</option>
+              </select>
+            </div>
+
+            <label class="checkbox-label" title="Safe resume over network with /Z">
+              <input type="checkbox" id="sendOptRestartable" checked> Safe Resume (/Z)
+            </label>
+
+            <label class="checkbox-label" title="Direct unbuffered I/O with /J (optimal for gigabit & large files)">
+              <input type="checkbox" id="sendOptUnbuffered" checked> Direct I/O (/J)
+            </label>
+
+            <label class="checkbox-label" title="Exclude older files (/XO)">
+              <input type="checkbox" id="sendOptExcludeOlder" checked> Exclude Older (/XO)
+            </label>
+
+            <label class="checkbox-label" title="Automatically trigger verification after copy completes">
+              <input type="checkbox" id="sendOptAutoVerify"> 🛡 Auto-Verify on Finish
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 0.6rem;">
+            <button class="btn-nm btn-primary" id="btnStartTransfer" onclick="startTransfer()">
+              ▶ Start Transfer
+            </button>
+            <button class="btn-nm btn-danger" id="btnStopTransfer" onclick="stopTransfer()" disabled>
+              ■ Stop / Abort
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DUAL-DECK SPLIT ARCHITECTURE -->
+      <div class="dual-deck-layout">
+        
+        <!-- LEFT DECK: SOURCE SYSTEM -->
+        <div class="nm-card deck-card source-deck">
+          <div class="deck-header">
+            <div class="deck-title-group">
+              <span class="deck-pill deck-pill-source">SOURCE SYSTEM</span>
+              <span class="deck-sub-title" id="sourceSubTitle">Local / Network Source</span>
+            </div>
+            <div class="badge-status">
+              <span class="status-dot dot-sm online" id="sourceDot"></span>
+              <span id="sourceStatusText">Connected</span>
+            </div>
+          </div>
+
+          <div class="path-box">
+            <span class="path-text" id="sourcePathDisplay">Select source folder</span>
+          </div>
+
+          <!-- Source Speed Dial & Equalizer -->
+          <div class="speed-dial-box">
+            <div class="dial-circle-outer source-circle">
+              <div class="dial-inner source-inner">
+                <span class="flow-icon flow-upload">↑</span>
+                <span class="dial-value upload-val" id="sourceUploadSpeed">0 B/s</span>
+                <span class="dial-sub">Upload / Read</span>
+              </div>
+            </div>
+
+            <!-- Upload Equalizer -->
+            <div class="eq-container eq-source" id="sourceEqualizer">
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+            </div>
+            <div class="rate-caption">Disk Read Outflow Rate</div>
+          </div>
+
+          <!-- Source Metrics Grid -->
+          <div class="deck-metrics-grid">
+            <div class="metric-cell">
+              <span class="metric-label">Source Capacity</span>
+              <span class="metric-val" id="sourceCapacityText">—</span>
+              <div class="mini-track">
+                <div class="mini-fill fill-source" id="sourceCapacityFill" style="width: 0%;"></div>
+              </div>
+              <span class="metric-sub" id="sourceUsedText">Used: —</span>
+            </div>
+
+            <div class="metric-cell">
+              <span class="metric-label">Source Files</span>
+              <span class="metric-val" id="sourceFilesCount">0</span>
+              <span class="metric-sub" id="sourceTotalBytes">0 B total</span>
+            </div>
+          </div>
+
+          <div class="recessed-stream-tag">
+            <span class="tag-title">READING FOLDER</span>
+            <span class="tag-content" id="activeFolderDisplay">Source</span>
+          </div>
+
+          <button class="btn-nm btn-sm" onclick="openFolder(document.getElementById('sendSourceInput').value)">
+            📂 Explore Source Folder
+          </button>
+        </div>
+
+
+        <!-- CENTER NEXUS: DATA PIPELINE & ETA -->
+        <div class="center-nexus">
+          <!-- Flow Pipeline Particles -->
+          <div class="flow-pipeline" id="flowPipeline">
+            <div class="particle p1"></div>
+            <div class="particle p2"></div>
+            <div class="particle p3"></div>
+            <div class="pipeline-line"></div>
+          </div>
+
+          <!-- Center Circular Progress Ring -->
+          <div class="nexus-progress-card">
+            <div class="dial-circle-outer center-circle">
+              <svg class="progress-ring" width="118" height="118">
+                <circle class="progress-ring-bg" stroke-width="8" cx="59" cy="59" r="50"></circle>
+                <circle class="progress-ring-fill" id="progressRingFill" stroke-width="8" cx="59" cy="59" r="50"></circle>
+              </svg>
+              <div class="dial-inner center-inner">
+                <span class="dial-value center-pct" id="progressPercentValue">0%</span>
+                <span class="dial-sub">Progress</span>
+              </div>
+            </div>
+            <div class="progress-bytes-label" id="progressBytesCaption">0 B / 0 B</div>
+          </div>
+
+          <!-- PROMINENT ESTIMATION TIME (ETA) CARD -->
+          <div class="eta-nexus-card">
+            <div class="eta-header">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="eta-clock-icon">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              <span class="eta-title">ESTIMATION TIME</span>
+            </div>
+            <div class="eta-huge-val" id="etaDisplayValue">—</div>
+            <div class="eta-elapsed-sub" id="elapsedCaption">Elapsed: 00:00:00</div>
+          </div>
+
+          <div class="nexus-files-badge">
+            <span class="files-copied-num" id="filesCountValue">0</span>
+            <span class="files-of-total" id="filesTotalSub">of 0 files</span>
+          </div>
+        </div>
+
+
+        <!-- RIGHT DECK: DESTINATION SYSTEM -->
+        <div class="nm-card deck-card dest-deck">
+          <div class="deck-header">
+            <div class="deck-title-group">
+              <span class="deck-pill deck-pill-dest">DESTINATION SYSTEM</span>
+              <span class="deck-sub-title" id="destSubTitle">Target Volume</span>
+            </div>
+            <div class="badge-status">
+              <span class="status-dot dot-sm online" id="destDot"></span>
+              <span id="destStatusText">Connected</span>
+            </div>
+          </div>
+
+          <div class="path-box">
+            <span class="path-text" id="destPathDisplay">Select destination folder</span>
+          </div>
+
+          <!-- Destination Speed Dial & Equalizer -->
+          <div class="speed-dial-box">
+            <div class="dial-circle-outer dest-circle">
+              <div class="dial-inner dest-inner">
+                <span class="flow-icon flow-download">↓</span>
+                <span class="dial-value download-val" id="destDownloadSpeed">0 B/s</span>
+                <span class="dial-sub">Download / Write</span>
+              </div>
+            </div>
+
+            <!-- Download Equalizer -->
+            <div class="eq-container eq-dest" id="destEqualizer">
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+              <div class="eq-bar"></div>
+            </div>
+            <div class="rate-caption">Disk Write Inflow Rate</div>
+          </div>
+
+          <!-- Destination Metrics Grid -->
+          <div class="deck-metrics-grid">
+            <div class="metric-cell">
+              <span class="metric-label">Target Free Space</span>
+              <span class="metric-val metric-free" id="destFreeText">—</span>
+              <div class="mini-track">
+                <div class="mini-fill fill-dest" id="destCapacityFill" style="width: 0%;"></div>
+              </div>
+              <span class="metric-sub" id="destTotalText">Total: —</span>
+            </div>
+
+            <div class="metric-cell">
+              <span class="metric-label">Robocopy Process</span>
+              <span class="metric-val" id="robocopyPidText">Idle</span>
+              <span class="metric-sub" id="destSpeedMbpsCaption">0.0 MB/s peak</span>
+            </div>
+          </div>
+
+          <div class="recessed-stream-tag">
+            <span class="tag-title tag-dest">WRITING FOLDER</span>
+            <span class="tag-content" id="activeDestFolderDisplay">Target</span>
+          </div>
+
+          <button class="btn-nm btn-sm" onclick="openFolder(document.getElementById('sendDestInput').value)">
+            📂 Explore Destination Folder
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Real-Time Throughput Graph -->
+      <div class="nm-card sparkline-card">
+        <div class="sparkline-header">
+          <div class="sparkline-title">Real-Time Throughput Graph (MB/s)</div>
+          <div class="sparkline-legends">
+            <div class="legend-chip">
+              <span class="status-dot dot-sm legend-dot-source"></span>
+              <span>Read / Upload</span>
+            </div>
+            <div class="legend-chip">
+              <span class="status-dot dot-sm legend-dot-dest"></span>
+              <span>Write / Download</span>
+            </div>
+            <div class="legend-chip" id="peakSpeedDisplay" style="font-family: 'JetBrains Mono', monospace; color: var(--success); font-weight: 700;">
+              Peak: 0.0 MB/s
+            </div>
+          </div>
+        </div>
+
+        <div class="sparkline-canvas-box">
+          <canvas id="speedSparkline" width="1120" height="110"></canvas>
+        </div>
+      </div>
+
+      <!-- Active File Name Banner -->
+      <div class="recessed-stream-tag" style="padding: 0.75rem 1rem;">
+        <span class="tag-title tag-dest">CURRENT TRANSMITTING FILE:</span>
+        <span class="tag-content" id="activeFileDisplay" style="font-size: 0.85rem; font-weight: 600;">Idle • Ready to copy</span>
+      </div>
+
+      <!-- Robocopy Execution Terminal -->
+      <div class="nm-card log-card">
+        <div class="log-header">
+          <div class="log-title-group">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color: var(--source-light);"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <span class="log-title">Robocopy Execution Stream</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <label class="checkbox-label"><input type="checkbox" id="logAutoScroll" checked> Auto-Scroll</label>
+            <button class="btn-nm btn-xs" onclick="clearStreamLog()">Clear</button>
+          </div>
+        </div>
+        <div class="log-stream-box" id="consoleLog">
+          <div class="log-msg info">[Ready] Robocopy Transfer Engine initialized. Waiting for transfer command.</div>
+        </div>
+      </div>
+
+    </main>
+
+
+    <!-- ========================================================
+         VIEW 3: RECEIVE (RECEIVER COCKPIT)
+         ======================================================== -->
+    <main class="tab-view" id="viewReceive">
+      
+      <div class="nm-card receive-network-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 class="section-title">Receiver Network Identity & Share Assistant</h2>
+            <p class="section-desc">Provide these UNC paths to the Sender computer over your Ethernet cable or local network.</p>
+          </div>
+          <span class="deck-pill deck-pill-dest">RECEIVER MODE</span>
+        </div>
+
+        <!-- UNC Copy Boxes -->
+        <div class="unc-copy-box">
+          <div class="unc-row">
+            <div>
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">UNC Path via Hostname:</span>
+              <div class="unc-text" id="receiveUncHostDisplay">\\Sangrechy\Transfers</div>
+            </div>
+            <button class="btn-nm btn-sm" onclick="copyText(document.getElementById('receiveUncHostDisplay').innerText)">📋 Copy</button>
+          </div>
+
+          <div class="unc-row">
+            <div>
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">UNC Path via IP Address:</span>
+              <div class="unc-text" id="receiveUncIpDisplay">\\10.96.64.155\Transfers</div>
+            </div>
+            <button class="btn-nm btn-sm" onclick="copyText(document.getElementById('receiveUncIpDisplay').innerText)">📋 Copy</button>
+          </div>
+        </div>
+
+        <!-- Incoming Folder Selection -->
+        <div class="path-input-col">
+          <div class="path-lbl">
+            <span>INCOMING DESTINATION DIRECTORY (Where received files land)</span>
+            <span id="receiveWatcherStateText" style="color: var(--success);">Watcher: Idle</span>
+          </div>
+          <div class="input-with-btn">
+            <input type="text" id="receiveFolderInput" class="input-nm" value="D:\Received_Transfers">
+            <button class="btn-nm btn-sm" onclick="browseFolder('receiveFolderInput')">📁 Browse</button>
+            <button class="btn-nm btn-primary" id="btnToggleReceiverWatcher" onclick="toggleReceiverWatcher()">▶ Start Folder Watcher</button>
+          </div>
+        </div>
+
+        <!-- Cross-Platform Network Share Helper -->
+        <div class="share-cmd-helper">
+          <div>
+            <span style="color: var(--text-muted);">Network Share Helper: </span>
+            <span class="share-cmd-code" id="receiveShareCmdSnippet">Auto-configures network permissions with rollback lease</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-nm btn-xs" onclick="autoShareIncomingFolder()">⚡ Auto-Share Now</button>
+            <button class="btn-nm btn-xs" style="color: var(--danger);" onclick="revokeShareIncomingFolder()">🔒 Revoke Share</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inbound Telemetry Grid -->
+      <div class="deck-metrics-grid" style="grid-template-columns: 260px 1fr;">
+        
+        <!-- Inbound Speed Dial -->
+        <div class="nm-card speed-dial-box">
+          <div class="dial-circle-outer dest-circle">
+            <div class="dial-inner dest-inner">
+              <span class="flow-icon flow-download">↓</span>
+              <span class="dial-value download-val" id="receiveInboundSpeed">0 B/s</span>
+              <span class="dial-sub">Inbound Rate</span>
+            </div>
+          </div>
+          <div class="rate-caption">Incoming Disk Write Throughput</div>
+          <div style="margin-top: 0.85rem; width: 100%;">
+            <button class="btn-nm btn-primary btn-sm" style="width: 100%;" onclick="transferReceivedToVerifier()">
+              🛡 Verify Received Files ➔
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Inbound Arrival Table -->
+        <div class="nm-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div>
+              <span style="font-weight: 700; font-size: 0.92rem;">Live Inbound File Activity</span>
+              <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;" id="receiveFilesCountCaption">(0 files received)</span>
+            </div>
+            <button class="btn-nm btn-xs" onclick="openFolder(document.getElementById('receiveFolderInput').value)">📂 Open Folder</button>
+          </div>
+
+          <div class="ledger-table-box" style="max-height: 220px;">
+            <table class="ledger-table">
+              <thead>
+                <tr>
+                  <th>Arrived File Name</th>
+                  <th>Size</th>
+                  <th>Status</th>
+                  <th>Last Modified</th>
+                </tr>
+              </thead>
+              <tbody id="receiveRecentFilesBody">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Waiting for incoming files…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+
+    <!-- ========================================================
+         VIEW 4: VERIFY (TRANSACTION DEEP VERIFIER)
+         ======================================================== -->
+    <main class="tab-view" id="viewVerify">
+      
+      <!-- INVENTORY PARITY OVERVIEW (DUAL WINGS) -->
+      <div class="inventory-grid">
+        
+        <!-- Source Tree Wing -->
+        <div class="nm-card tree-card source-tree">
+          <div class="tree-card-header">
+            <span class="tree-badge source-badge">SOURCE INVENTORY</span>
+            <div class="input-with-btn" style="margin-top: 3px;">
+              <input type="text" id="verifySourceInput" class="input-nm" placeholder="E:\Data\TransferFolder" style="font-size: 0.78rem;">
+              <button class="btn-nm btn-xs" onclick="browseFolder('verifySourceInput')">📁</button>
+            </div>
+          </div>
+          <div class="tree-metrics">
+            <div class="tree-stat">
+              <span class="stat-num" id="verifySrcFilesDisplay">—</span>
+              <span class="stat-lbl">Indexed Files</span>
+            </div>
+            <div class="tree-stat">
+              <span class="stat-num" id="verifySrcBytesDisplay">—</span>
+              <span class="stat-lbl">Total Volume</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Center Parity Shield -->
+        <div class="center-shield">
+          <div class="shield-circle">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="shield-icon">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+          </div>
+          <span class="shield-label">PARITY AUDIT</span>
+        </div>
+
+        <!-- Destination Tree Wing -->
+        <div class="nm-card tree-card dest-tree">
+          <div class="tree-card-header">
+            <span class="tree-badge dest-badge">DESTINATION INVENTORY</span>
+            <div class="input-with-btn" style="margin-top: 3px;">
+              <input type="text" id="verifyDestInput" class="input-nm" placeholder="D:\Transfer" style="font-size: 0.78rem;">
+              <button class="btn-nm btn-xs" onclick="browseFolder('verifyDestInput')">📁</button>
+            </div>
+          </div>
+          <div class="tree-metrics">
+            <div class="tree-stat">
+              <span class="stat-num stat-dest" id="verifyDstFilesDisplay">—</span>
+              <span class="stat-lbl">Target Files</span>
+            </div>
+            <div class="tree-stat">
+              <span class="stat-num stat-dest" id="verifyDstBytesDisplay">—</span>
+              <span class="stat-lbl">Target Volume</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Mode Selection Rigor Cards -->
+      <div class="nm-card mode-card">
+        <div class="mode-header">
+          <div>
+            <h2 class="section-title">Select Audit Verification Rigor</h2>
+            <p class="section-desc">Choose between ultra-fast metadata parity, smart block sampling, or full cryptographic SHA-256 bit-by-bit check.</p>
+          </div>
+          <div class="thread-selector">
+            <span class="thread-lbl">Workers:</span>
+            <div class="segmented-control">
+              <button class="segment-btn" onclick="setVerifyWorkers(2)" id="vw2">2</button>
+              <button class="segment-btn active" onclick="setVerifyWorkers(4)" id="vw4">4</button>
+              <button class="segment-btn" onclick="setVerifyWorkers(8)" id="vw8">8</button>
+              <button class="segment-btn" onclick="setVerifyWorkers(16)" id="vw16">16</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mode-cards-grid">
+          <!-- Level 1 -->
+          <div class="mode-choice-card active" id="modeCardMetadata" onclick="selectVerifyRigor('metadata')">
+            <div class="mode-choice-header">
+              <div class="mode-dot"></div>
+              <span class="mode-name">Fast Parity Audit</span>
+            </div>
+            <p class="mode-desc">Verifies relative paths, exact byte sizes down to the single byte, and file modification timestamps. (Completes in seconds).</p>
+          </div>
+
+          <!-- Level 2 -->
+          <div class="mode-choice-card" id="modeCardSmart" onclick="selectVerifyRigor('smart')">
+            <div class="mode-choice-header">
+              <div class="mode-dot"></div>
+              <span class="mode-name">Smart Block Checksum</span>
+            </div>
+            <p class="mode-desc">Cryptographic SHA-256 on Header (1MB), Middle (1MB), and Footer (1MB) blocks. Catches truncations and bit corruption 10x faster.</p>
+          </div>
+
+          <!-- Level 3 -->
+          <div class="mode-choice-card" id="modeCardFull" onclick="selectVerifyRigor('full_sha256')">
+            <div class="mode-choice-header">
+              <div class="mode-dot"></div>
+              <span class="mode-name">Full Cryptographic SHA-256</span>
+            </div>
+            <p class="mode-desc">100% bit-by-bit SHA-256 hashing across all volume data. Mathematically guarantees zero bit rot or silent corruption.</p>
+          </div>
+        </div>
+
+        <!-- Controls Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem;">
+          <div style="display: flex; gap: 0.75rem;">
+            <button class="btn-nm btn-primary" id="btnStartVerify" onclick="startVerification()">
+              🛡 Execute Verification Audit
+            </button>
+            <button class="btn-nm btn-danger" id="btnStopVerify" onclick="stopVerification()" disabled>
+              ■ Cancel Audit
+            </button>
+          </div>
+          <button class="btn-nm btn-accent" id="btnExportCert" onclick="exportVerificationCertificate()">
+            📜 Export Audit Certificate (.HTML)
+          </button>
+        </div>
+      </div>
+
+      <!-- Auditor Execution Deck -->
+      <div class="nm-card auditor-deck">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="verifyProgressFill" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-info-row">
+          <div class="current-audit-file" id="verifyActiveFile">Ready for audit execution.</div>
+          <div style="font-family: 'JetBrains Mono', monospace;" id="verifyProgressPercent">0% (0 / 0)</div>
+          <div style="font-family: 'JetBrains Mono', monospace; color: #fbbf24;" id="verifyEtaDisplay">ETA: --:--:--</div>
+        </div>
+
+        <!-- 4 Stat Cells -->
+        <div class="audit-stats-grid">
+          <div class="stat-box">
+            <div class="stat-val-huge val-matched" id="vStatMatched">0</div>
+            <div class="stat-lbl">Verified Matches</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val-huge val-mismatch" id="vStatMismatches">0</div>
+            <div class="stat-lbl">Mismatches / Corrupted</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val-huge val-missing" id="vStatMissing">0</div>
+            <div class="stat-lbl">Missing on Target</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val-huge val-extra" id="vStatExtra">0</div>
+            <div class="stat-lbl">Extra on Target</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Searchable & Filterable Audit Ledger -->
+      <div class="nm-card ledger-card">
+        <div class="ledger-toolbar">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 0.95rem; font-weight: 700;">Interactive Audit Ledger</span>
+            <span class="tree-badge" id="ledgerCountBadge">0 files</span>
+          </div>
+
+          <!-- Filter buttons -->
+          <div class="ledger-filters">
+            <button class="filter-btn active" onclick="filterAuditLedger('ALL')">All</button>
+            <button class="filter-btn" onclick="filterAuditLedger('MATCH')">Matched</button>
+            <button class="filter-btn" onclick="filterAuditLedger('MISMATCH')">Mismatches</button>
+            <button class="filter-btn" onclick="filterAuditLedger('MISSING_DEST')">Missing</button>
+            <button class="filter-btn" onclick="filterAuditLedger('EXTRA_DEST')">Extra</button>
+          </div>
+
+          <div style="width: 260px;">
+            <input type="text" id="ledgerSearchInput" class="input-nm" placeholder="🔍 Search file path..." oninput="onAuditSearch()">
+          </div>
+        </div>
+
+        <div class="ledger-table-box">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Relative File Path</th>
+                <th>Source Size</th>
+                <th>Target Size</th>
+                <th>Integrity Status</th>
+                <th>Checksum / Fingerprint</th>
+                <th>Audit Detail</th>
+              </tr>
+            </thead>
+            <tbody id="auditLedgerBody">
+              <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No audit executed yet. Choose folders and click "Execute Verification Audit".</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+
+    <!-- ========================================================
+         VIEW 5: HISTORY (PERSISTENT SQLITE DATABASE)
+         ======================================================== -->
+    <main class="tab-view" id="viewHistory">
+      
+      <div class="nm-card history-card">
+        <div class="history-toolbar">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.05rem; font-weight: 700;">Session History & Audit Ledger</span>
+            <span class="tree-badge" style="color: #fbbf24;">SQLite Database</span>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="filter-btn active" onclick="filterHistoryTable('ALL')">All Sessions</button>
+            <button class="filter-btn" onclick="filterHistoryTable('TRANSFER')">Transfers</button>
+            <button class="filter-btn" onclick="filterHistoryTable('VERIFY')">Verifications</button>
+            <button class="btn-nm btn-xs btn-danger" style="margin-left: 0.75rem;" onclick="clearHistoryDb()">🗑 Clear All</button>
+          </div>
+        </div>
+
+        <div class="ledger-table-box" style="max-height: 480px;">
+          <table class="ledger-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Type</th>
+                <th>Source Directory</th>
+                <th>Destination Directory</th>
+                <th>Files & Volume</th>
+                <th>Throughput & Time</th>
+                <th>Outcome</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading historical records…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- TOAST STACK CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

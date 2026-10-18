@@ -1,12 +1,46 @@
 # ⚡ Ethernet File Transfer & Deep Verification Suite
 
-A high-performance **Dark Neumorphic (Soft UI)** application suite designed for ultra-fast, resilient local network and direct Ethernet file transfers and bit-level transaction audits.
-
-The suite combines a multi-threaded Windows Robocopy process orchestrator with kernel I/O speed telemetry and a standalone cryptographic verification engine.
+A high-performance **Dark Neumorphic & Glassmorphic Desktop Application Suite** designed for ultra-fast, resilient local network and direct Ethernet file transfers and bit-level transaction audits on Windows.
 
 ---
 
-## 📦 Suite Applications
+## 🚀 Quick Start: v2 Unified Cockpit (Cross-Platform)
+
+**v2 combines Send, Receive, 3-Tier Verification, and SQLite History into a single modern desktop app running across Windows, Linux, and macOS:**
+
+```bash
+# Launch v2 application:
+cd share_by_ethernet_tool/v2
+python app.py
+```
+
+* **Home:** Hardware network adapters, link speeds (1G/2.5G/10G), IP display, local drive storage meters.
+* **Send:** Multithreaded Robocopy (`/Z /J /MT`) on Windows, `rsync` (`--partial --inplace`) on Linux/macOS, dual kernel I/O dials, live 60fps canvas chart, safe resume, auto-verify.
+* **Receive:** Computer IP & hostname display, automated network share provisioner with permission rollback, live incoming folder watcher.
+* **Verify:** Sender vs Receiver cross-audit or single-tree audit with Fast Parity, Smart Block SHA-256, or Full Bit-by-Bit SHA-256, plus exportable HTML certificates.
+* **History:** Persistent SQLite history ledger (`tshare_history.db`) with one-click re-verify and folder open.
+
+### 🌐 Cross-Platform Architecture & Decoupled Platform Folders
+Operating-system-specific logic is strictly decoupled into dedicated modules under `v2/platforms/`:
+* **`v2/platforms/win/`**: Windows adapter (Robocopy `/E /Z /J /MT:8`, Win32 `GetProcessIoCounters`, PowerShell network discovery, `net share` UAC elevation).
+* **`v2/platforms/linux/`**: Linux adapter (`rsync --partial --inplace`, `/proc/[pid]/io` kernel metrics, `ip/sysfs` discovery, Samba usershares with `pkexec` elevation).
+* **`v2/platforms/mac/`**: macOS adapter (`rsync`, `scutil/networksetup` discovery, macOS `sharing` CLI with AppleScript administrator prompt).
+
+### 🛡️ Fail-Safe Share Permission Lease & Crash Recovery
+* **Permission Journaling:** Before modifying any network sharing permissions or creating a share, the app journals the lease in `share_lease.json`.
+* **Automatic Rollback:** Share permissions are immediately revoked when a transfer completes, is canceled, or when receiver monitoring stops.
+* **Boot-Time Recovery:** If the app is killed abruptly, crashes, or the machine shuts down during a transfer, **the very first action executed upon next startup is detecting the orphaned lease and revoking all share permissions**.
+
+---
+
+## 📦 Suite Versions
+
+* **[v2/ (Unified Desktop Cockpit)](file:///E:/projects/project_tshare/share_by_ethernet_tool/v2):** All-in-one unified desktop application combining transfer, receiver, deep verification, history, and cross-platform decoupling (`win`, `linux`, `mac`).
+* **[v1/ (Original Split Tools)](file:///E:/projects/project_tshare/share_by_ethernet_tool/v1/README.md):** Standalone monitors (`app.py` for Transfer and `verify_app.py` for Verification).
+
+---
+
+## 📦 Legacy Suite Applications (v1)
 
 ### 1. Dual-Deck Robocopy Transfer Monitor (`app.py`)
 * **Safe Resume Mode:** Uses Windows Robocopy with `/E /Z /J /XO /FFT /R:2 /W:2 /MT:8` to safely copy and resume interrupted transfers without ever deleting or corrupting existing destination files.

@@ -30,3 +30,8 @@ npm-debug.log*
 .env
 .DS_Store
 Thumbs.db
+
+# Databases & Runtime Leases
+*.db
+share_lease.json
+tshare_history.db
