@@ -229,23 +229,91 @@ def run_full_diagnostic(target_ip: Optional[str] = None):
             print("[OK] Fedora Ethernet adapter has 192.168.123.2 configured.\n")
 
 
+def auto_configure_wire():
+    """Automatically assigns direct wire IP (192.168.123.2 on Linux, 192.168.123.1 on Windows)."""
+    import shutil
+    if sys.platform.startswith("linux"):
+        is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
+        eth = ""
+        net_path = "/sys/class/net"
+        if os.path.exists(net_path):
+            for d in os.listdir(net_path):
+                if d != "lo" and not os.path.exists(f"{net_path}/{d}/wireless") and os.path.exists(f"{net_path}/{d}/device"):
+                    eth = d
+                    break
+        if not eth:
+            print("[-] No physical Ethernet interface detected on Linux.")
+            return
+
+        print(f"[*] Detected physical Ethernet interface: {eth}")
+        proc = subprocess.run(["ip", "-4", "addr", "show", "dev", eth], capture_output=True, text=True)
+        if "192.168.123.2" in proc.stdout:
+            print(f"[OK] {eth} already has direct wire IP 192.168.123.2.")
+        else:
+            print(f"[*] Assigning 192.168.123.2/24 to {eth}...")
+            pfx = [] if is_root else ["sudo"]
+            subprocess.run(pfx + ["ip", "addr", "add", "192.168.123.2/24", "dev", eth], capture_output=True)
+            subprocess.run(pfx + ["ip", "link", "set", eth, "up"], capture_output=True)
+            print(f"[OK] Assigned 192.168.123.2 to {eth}.")
+
+        # Open firewall
+        if shutil.which("firewall-cmd"):
+            pfx = [] if is_root else ["sudo"]
+            subprocess.run(pfx + ["firewall-cmd", "--add-port=52000-52010/tcp", "--add-port=52000-52010/udp"], capture_output=True)
+            print("[OK] Opened firewall ports 52000-52010 via firewall-cmd.")
+        elif shutil.which("ufw"):
+            pfx = [] if is_root else ["sudo"]
+            subprocess.run(pfx + ["ufw", "allow", "52000:52010/tcp"], capture_output=True)
+            subprocess.run(pfx + ["ufw", "allow", "52000:52010/udp"], capture_output=True)
+            print("[OK] Opened firewall ports 52000-52010 via ufw.")
+
+    elif sys.platform == "win32":
+        from backend.hardware_info import get_detailed_adapters
+        eths, _, _ = get_detailed_adapters()
+        if eths:
+            cur_ip = eths[0].get("ip", "")
+            if not cur_ip.startswith("192.168.123."):
+                print(f"[*] Windows Ethernet ({eths[0]['name']}) is on {cur_ip}. Running set_ethernet_ip.bat or assigning 192.168.123.1...")
+                from backend.network_config import configure_direct_ethernet
+                configure_direct_ethernet()
+
+
 def main():
     parser = argparse.ArgumentParser(description="T-Share v3 Connection Checker & Diagnostic Tool")
-    parser.add_argument("--server", action="store_true", help="Run diagnostic HTTP server in foreground")
+    parser.add_argument("--server", action="store_true", help="Run diagnostic agent and receiver in foreground")
     parser.add_argument("--target", type=str, help="Target peer IP address")
     parser.add_argument("--exec", type=str, help="Run remote diagnostic command on target")
     args = parser.parse_args()
 
     if args.server:
-        print(f"[*] Starting T-Share Diagnostic Agent on 0.0.0.0:{DIAG_PORT}...")
+        print("=" * 66)
+        print("  T-Share v3: High-Speed Direct Wire Diagnostic Agent & Receiver")
+        print("=" * 66)
+
+        # 1. Automatically configure wire IP
+        auto_configure_wire()
+
+        # 2. Start Receiver on port 52001
+        from backend.receiver_engine import ReceiverEngine
+        receiver = ReceiverEngine(port=52001)
+        try:
+            receiver.start()
+            print(f"[OK] T-Share Receiver active and listening on port {receiver.port}.")
+        except Exception as e:
+            print(f"[!] Receiver could not start on 52001: {e}")
+
+        # 3. Start Diagnostic Agent on port 52005
         start_diagnostic_service()
-        print("[*] Diagnostic Agent is running. Press Ctrl+C to stop.")
+        print(f"[OK] Diagnostic Agent active on 0.0.0.0:{DIAG_PORT}.")
+        print("[*] Ready for connection checks from the other machine. Press Ctrl+C to stop.\n")
+
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
             stop_diagnostic_service()
-            print("\n[*] Stopped.")
+            receiver.stop()
+            print("\n[*] Diagnostic Agent and Receiver stopped.")
             sys.exit(0)
 
     if args.exec:
