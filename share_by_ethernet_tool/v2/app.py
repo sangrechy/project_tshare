@@ -15,6 +15,7 @@ import time
 from typing import Any, Dict
 
 from backend.bridge import UnifiedBridge
+from backend.dependency_checker import ensure_dependencies
 from backend.history_db import init_db
 from backend.network_detector import revoke_network_share
 from backend.receiver_engine import ReceiverEngine
@@ -116,6 +117,10 @@ def on_closing() -> bool:
 def run_app(source_path: str = "", dest_path: str = "", startup_cleanup: dict[str, Any] | None = None) -> None:
     """Launch the unified desktop application using PyWebView with Edge WebView2."""
     global active_window, transfer_engine, verify_engine, receiver_engine, bridge
+
+    # Pre-flight: verify and auto-install Python packages if needed
+    ensure_dependencies()
+
     import webview
 
     # Ensure startup orphaned share cleanup has occurred

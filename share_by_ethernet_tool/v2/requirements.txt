@@ -1,0 +1,13 @@
+# ==============================================================================
+# ⚡ T-Share v2 • Dependencies Specification
+# Cross-Platform Ethernet Transfer & Deep Cryptographic Verification Suite
+# Supported Operating Systems: Windows 10/11, Linux (Ubuntu/Debian/Arch/Fedora), macOS 11+
+# ==============================================================================
+
+# Core Native Desktop GUI WebView Engine (Edge Chromium, WebKit, GTK)
+pywebview>=5.0.0
+
+# macOS Native WebKit bindings (evaluated and installed only on macOS)
+pyobjc-core>=9.0; sys_platform == 'darwin'
+pyobjc-framework-Cocoa>=9.0; sys_platform == 'darwin'
+pyobjc-framework-WebKit>=9.0; sys_platform == 'darwin'

@@ -18,20 +18,43 @@ A unified, high-performance **Dark Neumorphic & Glassmorphic Desktop Application
 
 ---
 
-## 🚀 Quick Launch
+## 🚀 Quick Launch (Per OS Launchers)
 
-### 1. Launch via Batch File
-Double-click `run.bat` in `share_by_ethernet_tool/v2/`.
+Each launcher automatically checks dependencies, self-installs any missing Python packages via `pip`, verifies system utilities (Robocopy on Windows, rsync on Linux/macOS), and launches the Cockpit.
 
-### 2. Launch via PowerShell / CMD
-```powershell
-cd E:\projects\project_tshare\share_by_ethernet_tool\v2
-python app.py
+### 🪟 Windows:
+* **Double-click:** [`run.bat`](file:///e:/projects/project_tshare/share_by_ethernet_tool/v2/run.bat) (or `run_win.bat`)
+* **Terminal:**
+  ```powershell
+  cd share_by_ethernet_tool\v2
+  run.bat
+  ```
+
+### 🐧 Linux:
+* **Terminal:**
+  ```bash
+  cd share_by_ethernet_tool/v2
+  chmod +x run_linux.sh
+  ./run_linux.sh
+  ```
+
+### 🍎 macOS:
+* **Finder:** Double-click [`run_mac.command`](file:///e:/projects/project_tshare/share_by_ethernet_tool/v2/run_mac.command)
+* **Terminal:**
+  ```bash
+  cd share_by_ethernet_tool/v2
+  chmod +x run_mac.sh
+  ./run_mac.sh
+  ```
+
+### 🌐 Universal POSIX (Linux / macOS):
+```bash
+./run.sh
 ```
 
-### 3. Launch with Pre-Configured Source & Target Paths
-```powershell
-python app.py --source "E:\Data\BigFolder" --dest "\\192.168.1.50\Transfers"
+### ⚡ Launch with Pre-Configured Source & Target Paths:
+```bash
+python app.py --source "/path/to/source" --dest "/path/to/destination"
 ```
 
 ---
@@ -100,20 +123,36 @@ python app.py --source "E:\Data\BigFolder" --dest "\\192.168.1.50\Transfers"
 ```text
 share_by_ethernet_tool/
 ├── README.md                       # Root suite guide
-├── v1/                             # v1 standalone tools (preserved)
+├── requirements.txt                # Root dependencies specification
+├── run_v2.bat                      # Windows root launcher
+├── run_v2.sh                       # Linux / macOS root launcher
+├── v1/                             # v1 legacy standalone tools
 └── v2/                             # v2 Unified Cockpit
     ├── app.py                      # Main unified application entrypoint (PyWebView)
-    ├── run.bat                     # Windows 1-click batch launcher
+    ├── requirements.txt            # v2 dependencies (pywebview + macOS WebKit bindings)
+    ├── run.bat                     # Windows primary batch launcher (checks & installs deps)
+    ├── run_win.bat                 # Windows alias launcher
+    ├── run_linux.sh                # Linux bash launcher (checks & installs deps)
+    ├── run_mac.sh                  # macOS shell launcher (checks & installs deps)
+    ├── run_mac.command             # macOS Finder double-clickable launcher
+    ├── run.sh                      # Universal POSIX auto-dispatch launcher
     ├── README.md                   # Complete v2 documentation
-    ├── tshare_history.db           # Persistent SQLite database
     ├── backend/
     │   ├── __init__.py
     │   ├── bridge.py               # Bidirectional JS/Python API bridge & folder pickers
+    │   ├── dependency_checker.py   # Pre-flight environment audit & auto-installer
     │   ├── history_db.py           # SQLite database operations & aggregate stats
-    │   ├── network_detector.py     # Win32 network adapters, speeds, IPs, and drive telemetry
+    │   ├── network_detector.py     # Cross-platform network adapters, speeds, IPs, and drives
     │   ├── receiver_engine.py      # Incoming folder watcher & share assistant
-    │   ├── transfer_engine.py      # Robocopy orchestrator & kernel I/O speed counters
+    │   ├── transfer_engine.py      # Transfer orchestrator (Robocopy & rsync) & telemetry
     │   └── verify_engine.py        # 3-tier cryptographic verification & HTML certificates
+    ├── platforms/
+    │   ├── __init__.py             # Platform adapter factory & startup safety check
+    │   ├── base.py                 # Abstract PlatformAdapter ABC
+    │   ├── lease_manager.py        # Share lease journal & crash-recovery cleanup
+    │   ├── win/                    # Windows-specific implementation (Robocopy, Win32 I/O, net share)
+    │   ├── linux/                  # Linux-specific implementation (rsync, /proc/io, Samba pkexec)
+    │   └── mac/                    # macOS-specific implementation (rsync, sharing CLI, AppleScript)
     ├── ui/
     │   ├── index.html              # Unified Single-Page Application
     │   ├── styles.css              # Dark Neumorphic & Glassmorphic CSS design system
@@ -125,10 +164,11 @@ share_by_ethernet_tool/
 
 ## 🛠️ Requirements & Compatibility
 
-- **OS:** Windows 10 / 11 (uses native Windows Robocopy, Win32 kernel I/O counters, and Edge WebView2)
-- **Python:** 3.10+ (tested on Python 3.10 & 3.14)
+- **OS:** Windows 10/11, Linux (Ubuntu/Debian, Fedora, Arch), macOS 11+
+- **Python:** 3.8+ (tested on Python 3.10, 3.11, 3.12, 3.14)
 - **Dependencies:**
-  ```powershell
-  pip install pywebview
+  All Python dependencies are defined in `requirements.txt` and automatically installed by the launchers (`run.bat`, `run_linux.sh`, `run_mac.sh`):
+  ```bash
+  pip install -r requirements.txt
   ```
   *(Standard Python library supplies sqlite3, ctypes, threading, socket, hashlib, and subprocess)*
