@@ -81,7 +81,7 @@ class PeerDiscovery:
                         "ip": addr[0],
                         "port": msg.get("port", DEFAULT_TCP_PORT),
                         "last_seen": time.time(),
-                        "is_direct_ethernet": addr[0].startswith("169.254.")
+                        "is_direct_ethernet": addr[0].startswith("169.254.") or addr[0].startswith("192.168.123.")
                     }
                     with self._lock:
                         self._peers[peer_id] = peer_info
@@ -97,6 +97,14 @@ class PeerDiscovery:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.settimeout(0.2)
 
+        direct_targets = [
+            "255.255.255.255",
+            "192.168.123.255",
+            "192.168.123.1",
+            "192.168.123.2",
+            "169.254.255.255"
+        ]
+
         while self._running:
             try:
                 payload = json.dumps({
@@ -106,20 +114,22 @@ class PeerDiscovery:
                     "port": self.tcp_port
                 }).encode('utf-8')
 
-                # Broadcast on standard 255.255.255.255
-                try:
-                    sock.sendto(payload, ("255.255.255.255", self.broadcast_port))
-                except Exception:
-                    pass
+                # Broadcast to global, subnet, and direct cable unicast targets
+                for target_ip in direct_targets:
+                    try:
+                        sock.sendto(payload, (target_ip, self.broadcast_port))
+                    except Exception:
+                        pass
 
-                # Also broadcast specifically on link-local interface subnets
+                # Also broadcast on all local interface subnets
                 interfaces = get_network_interfaces()
                 for iface in interfaces:
                     ip = iface.get("ip")
-                    if ip and ip.startswith("169.254."):
+                    if ip and (ip.startswith("169.254.") or ip.startswith("192.168.123.")):
+                        parts = ip.split(".")
+                        bcast = f"{parts[0]}.{parts[1]}.{parts[2]}.255"
                         try:
-                            # 169.254.255.255 broadcast
-                            sock.sendto(payload, ("169.254.255.255", self.broadcast_port))
+                            sock.sendto(payload, (bcast, self.broadcast_port))
                         except Exception:
                             pass
             except Exception:

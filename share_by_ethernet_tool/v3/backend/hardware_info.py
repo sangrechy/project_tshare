@@ -69,15 +69,21 @@ def get_detailed_network_info() -> Dict[str, Any]:
             ipv4 = ""
             for addr in addr_list:
                 if addr.family == socket.AF_INET and not addr.address.startswith("127."):
-                    ipv4 = addr.address
-                    break
+                    if addr.address.startswith("192.168.123."):
+                        ipv4 = addr.address
+                        break
+                    elif not ipv4:
+                        ipv4 = addr.address
+
+            is_direct_wire_ip = bool(ipv4 and (ipv4.startswith("192.168.123.") or ipv4.startswith("169.254.")))
+            has_ip = bool(ipv4) if is_wifi else is_direct_wire_ip
 
             info = {
                 "name": name,
                 "ip": ipv4,
                 "is_up": is_up,
                 "speed_mbps": speed_mbps,
-                "has_ip": bool(ipv4),
+                "has_ip": has_ip,
                 "display": ipv4 if ipv4 else "Unconfigured"
             }
 
