@@ -248,6 +248,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 Select Folder
               </button>
+              <button id="btnEnterPath" class="btn-secondary" title="Manually type or paste file/folder path">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Enter Path
+              </button>
             </div>
 
             <!-- Source Manifest Preview -->
@@ -289,7 +293,7 @@
             <p class="card-desc">You have sole authority over where incoming files are saved.</p>
 
             <div class="destination-picker-box">
-              <input type="text" id="destinationPathInput" class="input-field" readonly placeholder="Default destination folder...">
+              <input type="text" id="destinationPathInput" class="input-field" placeholder="Enter or browse destination folder...">
               <button id="btnBrowseDestination" class="btn-secondary">Browse Folder</button>
             </div>
 

@@ -93,12 +93,87 @@ class BridgeAPI:
 
     # ------------------ FILE & FOLDER PICKERS ------------------
 
+    def _pick_paths_fallback(self, folder: bool = False, multiple: bool = True, title: str = "") -> List[str]:
+        """Cross-platform fallback file picker when native pywebview window is not active."""
+        # 1. Tkinter
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.wm_attributes('-topmost', 1)
+            if folder:
+                res = filedialog.askdirectory(title=title or "Select Folder")
+                root.destroy()
+                return [res] if res else []
+            else:
+                res = filedialog.askopenfilenames(title=title or "Select Files")
+                root.destroy()
+                return list(res) if res else []
+        except Exception:
+            pass
+
+        # 2. Linux zenity
+        if sys.platform.startswith("linux"):
+            try:
+                cmd = ["zenity", "--file-selection"]
+                if title:
+                    cmd.extend(["--title", title])
+                if folder:
+                    cmd.append("--directory")
+                elif multiple:
+                    cmd.extend(["--multiple", "--separator=|"])
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    return out.split("|") if (multiple and not folder) else [out]
+            except Exception:
+                pass
+
+            # 3. Linux kdialog
+            try:
+                cmd = ["kdialog"]
+                if title:
+                    cmd.extend(["--title", title])
+                if folder:
+                    cmd.append("--getexistingdirectory")
+                elif multiple:
+                    cmd.extend(["--getopenfilename", "--multiple"])
+                else:
+                    cmd.append("--getopenfilename")
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    return out.split() if (multiple and not folder) else [out]
+            except Exception:
+                pass
+
+        # 4. macOS osascript
+        if sys.platform == "darwin":
+            try:
+                if folder:
+                    script = 'choose folder with prompt "Select Folder"'
+                    cmd = ["osascript", "-e", f'POSIX path of ({script})']
+                elif multiple:
+                    script = 'choose file with prompt "Select Files" with multiple selections allowed'
+                    cmd = ["osascript", "-e", f'set f to {script}', "-e", 'repeat with i in f', "-e", 'log POSIX path of i', "-e", 'end repeat']
+                else:
+                    script = 'choose file with prompt "Select File"'
+                    cmd = ["osascript", "-e", f'POSIX path of ({script})']
+                out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    return [line.strip() for line in out.splitlines() if line.strip()]
+            except Exception:
+                pass
+
+        return []
+
     def select_source_files(self) -> Dict[str, Any]:
         """Sender file selection dialog."""
-        if not self._window:
-            return {"count": 0, "paths": []}
         try:
-            files = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True)
+            if self._window:
+                files = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True)
+            else:
+                files = self._pick_paths_fallback(folder=False, multiple=True, title="Select Files to Send")
+
             if files:
                 self._selected_source_paths = list(files)
             return self._summarize_selected_sources()
@@ -107,15 +182,31 @@ class BridgeAPI:
 
     def select_source_folder(self) -> Dict[str, Any]:
         """Sender folder selection dialog."""
-        if not self._window:
-            return {"count": 0, "paths": []}
         try:
-            folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            if self._window:
+                folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            else:
+                folders = self._pick_paths_fallback(folder=True, multiple=False, title="Select Folder to Send")
+
             if folders:
                 self._selected_source_paths = [folders[0]]
             return self._summarize_selected_sources()
         except Exception as e:
             return {"error": str(e), "count": 0, "paths": []}
+
+    def set_source_paths(self, paths: List[str]) -> Dict[str, Any]:
+        """Directly assigns or appends source paths (useful for manual entry and drag & drop)."""
+        valid_paths = []
+        for p in paths:
+            if not p:
+                continue
+            clean_p = os.path.abspath(p.strip().strip('"').strip("'"))
+            if os.path.exists(clean_p):
+                valid_paths.append(clean_p)
+
+        if valid_paths:
+            self._selected_source_paths = valid_paths
+        return self._summarize_selected_sources()
 
     def _summarize_selected_sources(self) -> Dict[str, Any]:
         total_size = 0
@@ -138,17 +229,29 @@ class BridgeAPI:
 
     def select_destination_folder(self) -> Dict[str, Any]:
         """Receiver destination selection dialog."""
-        if not self._window:
-            return {"path": ""}
         try:
-            folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            if self._window:
+                folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+            else:
+                folders = self._pick_paths_fallback(folder=True, multiple=False, title="Select Destination Folder")
+
             if folders:
                 chosen = os.path.abspath(folders[0])
                 self._receiver.active_destination = chosen
-                return {"path": chosen}
-            return {"path": self._receiver.active_destination}
+                return {"path": chosen, "success": True}
+            return {"path": self._receiver.active_destination, "success": True}
         except Exception as e:
-            return {"error": str(e), "path": ""}
+            return {"error": str(e), "path": self._receiver.active_destination, "success": False}
+
+    def set_destination_path(self, path: str) -> Dict[str, Any]:
+        """Directly sets receiver destination directory from text input."""
+        if not path:
+            return {"path": self._receiver.active_destination, "success": False, "error": "Empty path provided"}
+        clean_p = os.path.abspath(path.strip().strip('"').strip("'"))
+        if os.path.isdir(clean_p):
+            self._receiver.active_destination = clean_p
+            return {"path": clean_p, "success": True}
+        return {"path": self._receiver.active_destination, "success": False, "error": f"Directory does not exist: {clean_p}"}
 
     # ------------------ TRANSFER ACTIONS ------------------
 

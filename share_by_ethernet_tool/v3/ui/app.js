@@ -4,6 +4,32 @@
  * Strictly real metrics, zero mock data.
  */
 
+// Browser Mode Transparent API Bridge Polyfill
+if (!window.pywebview) {
+  window.pywebview = {
+    api: new Proxy({}, {
+      get: (_target, prop) => {
+        return async (...args) => {
+          try {
+            const resp = await fetch(`/api/${String(prop)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(args)
+            });
+            if (!resp.ok) {
+              return { error: `HTTP ${resp.status}: ${resp.statusText}` };
+            }
+            return await resp.json();
+          } catch (err) {
+            console.error(`Browser Mode API error on ${String(prop)}:`, err);
+            return { error: String(err) };
+          }
+        };
+      }
+    })
+  };
+}
+
 // Application State
 let activeTab = 'home';
 let selectedTargetIp = '';
@@ -11,6 +37,7 @@ let selectedTargetPort = 52001;
 let selectedVerifySessionId = null;
 let currentPendingOffer = null;
 let pollTimer = null;
+let appInitialized = false;
 
 // DOM Elements Initialization
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,10 +61,16 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pywebviewready', () => {
       initApp();
     });
+    setTimeout(() => {
+      if (!appInitialized) initApp();
+    }, 400);
   }
 });
 
 function initApp() {
+  if (appInitialized) return;
+  appInitialized = true;
+
   loadNetworkPill();
   loadSettings();
   loadHistory();
@@ -258,6 +291,17 @@ function setupSendControls() {
     updateSourceSelectionUI(res);
   });
 
+  const btnEnterPath = document.getElementById('btnEnterPath');
+  if (btnEnterPath) {
+    btnEnterPath.addEventListener('click', async () => {
+      const p = prompt("Enter absolute file or folder path to send:");
+      if (p && p.trim()) {
+        const res = await window.pywebview.api.set_source_paths([p.trim()]);
+        updateSourceSelectionUI(res);
+      }
+    });
+  }
+
   document.getElementById('btnStartTransfer').addEventListener('click', async () => {
     const ip = document.getElementById('manualIpInput').value.trim() || selectedTargetIp;
     const port = parseInt(document.getElementById('manualPortInput').value) || selectedTargetPort;
@@ -359,6 +403,19 @@ function setupReceiveControls() {
       document.getElementById('destinationPathInput').value = res.path;
     }
   });
+
+  const destInput = document.getElementById('destinationPathInput');
+  if (destInput) {
+    destInput.addEventListener('change', async () => {
+      const val = destInput.value.trim();
+      if (val && window.pywebview) {
+        const res = await window.pywebview.api.set_destination_path(val);
+        if (res && res.path) {
+          destInput.value = res.path;
+        }
+      }
+    });
+  }
 
   document.getElementById('btnCopyAddress').addEventListener('click', () => {
     const text = document.getElementById('receiverAddressPill').textContent;

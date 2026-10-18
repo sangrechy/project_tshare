@@ -135,6 +135,98 @@ class TestTSHAREV3(unittest.TestCase):
             with open(out, 'rb') as f:
                 self.assertEqual(f.read(), raw_bytes)
 
+    def test_09_bridge_api_and_fallbacks(self):
+        from backend.bridge import BridgeAPI
+        bridge = BridgeAPI()
+        
+        # Dashboard telemetry check
+        telemetry = bridge.get_dashboard_telemetry()
+        self.assertIn('hardware', telemetry)
+        self.assertEqual(telemetry['active_role'], 'none')
+
+        # Test path setting and summary
+        with tempfile.TemporaryDirectory() as td:
+            f1 = os.path.join(td, 'file1.txt')
+            with open(f1, 'w') as f:
+                f.write('hello world')
+            summary = bridge.set_source_paths([f1])
+            self.assertEqual(summary['count'], 1)
+            self.assertEqual(summary['total_bytes'], 11)
+
+            res_dest = bridge.set_destination_path(td)
+            self.assertTrue(res_dest['success'])
+            self.assertEqual(res_dest['path'], os.path.abspath(td))
+
+            res_bad = bridge.set_destination_path(os.path.join(td, 'does_not_exist'))
+            self.assertFalse(res_bad['success'])
+
+    def test_10_browser_mode_web_server(self):
+        import urllib.request
+        from http.server import HTTPServer
+        from backend.bridge import BridgeAPI
+        from backend.web_server import BridgeHTTPHandler
+
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        ui_dir = os.path.join(base_dir, "ui")
+        bridge = BridgeAPI()
+
+        BridgeHTTPHandler.bridge = bridge
+        BridgeHTTPHandler.ui_dir = ui_dir
+
+        server = HTTPServer(("127.0.0.1", 52044), BridgeHTTPHandler)
+        srv_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        srv_thread.start()
+
+        try:
+            # 1. Test GET / (HTML)
+            req = urllib.request.Request("http://127.0.0.1:52044/")
+            with urllib.request.urlopen(req) as resp:
+                self.assertEqual(resp.status, 200)
+                body = resp.read().decode('utf-8')
+                self.assertIn("T-Share v3", body)
+
+            # 2. Test GET /styles.css
+            req = urllib.request.Request("http://127.0.0.1:52044/styles.css")
+            with urllib.request.urlopen(req) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertIn("text/css", resp.headers.get("Content-Type", ""))
+
+            # 3. Test GET /app.js
+            req = urllib.request.Request("http://127.0.0.1:52044/app.js")
+            with urllib.request.urlopen(req) as resp:
+                self.assertEqual(resp.status, 200)
+                self.assertIn("application/javascript", resp.headers.get("Content-Type", ""))
+
+            # 4. Test POST /api/get_dashboard_telemetry
+            req = urllib.request.Request(
+                "http://127.0.0.1:52044/api/get_dashboard_telemetry",
+                data=b"[]",
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req) as resp:
+                self.assertEqual(resp.status, 200)
+                import json
+                data = json.loads(resp.read().decode('utf-8'))
+                self.assertIn("hardware", data)
+                self.assertIn("active_role", data)
+
+            # 5. Test POST /api/invalid_method -> 404
+            req = urllib.request.Request(
+                "http://127.0.0.1:52044/api/nonexistent_xyz",
+                data=b"[]",
+                headers={"Content-Type": "application/json"}
+            )
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    self.assertEqual(resp.status, 404)
+            except urllib.error.HTTPError as e:
+                self.assertEqual(e.code, 404)
+                e.close()
+
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
 if __name__ == '__main__':
     unittest.main()
