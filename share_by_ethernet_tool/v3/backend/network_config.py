@@ -221,8 +221,9 @@ $state | ConvertTo-Json | Set-Content -Path "{bpath_esc}" -Force
 New-NetFirewallRule -DisplayName "T-Share-Direct-Temp-TCP" -Direction Inbound -LocalPort 52000-52010 -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
 New-NetFirewallRule -DisplayName "T-Share-Direct-Temp-UDP" -Direction Inbound -LocalPort 52000-52010 -Protocol UDP -Action Allow -ErrorAction SilentlyContinue
 
-# 2. Temporary IP
-if (-not $curIps) {{
+# 2. Temporary IP (ensure Windows is in the 192.168.123.x subnet)
+$hasSubnet = (Get-NetIPAddress -InterfaceIndex $idx -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {{ $_.IPAddress -like "192.168.123.*" }})
+if (-not $hasSubnet) {{
   New-NetIPAddress -InterfaceIndex $idx -IPAddress 192.168.123.1 -PrefixLength 24 -ErrorAction SilentlyContinue
 }}
 

@@ -323,6 +323,11 @@ function setupSendControls() {
       if (scanBadge) scanBadge.textContent = "Scanning Wi-Fi...";
       refreshDiscoveredPeers();
     });
+  const btnSetupSender = document.getElementById('btnSetupSenderEthWire');
+  if (btnSetupSender) {
+    btnSetupSender.addEventListener('click', () => {
+      openAuthModal();
+    });
   }
 
   document.getElementById('btnSelectFiles').addEventListener('click', async () => {
@@ -564,6 +569,16 @@ async function loadNetworkPill() {
     // Legacy address pill
     const legacyPill = document.getElementById('receiverAddressPill');
     if (legacyPill) legacyPill.textContent = info.display_address;
+
+    // Sender Tab Ethernet setup notice
+    const senderNotice = document.getElementById('senderEthSetupNotice');
+    if (senderNotice) {
+      if (info.ethernet && !info.ethernet.has_ip && selectedMedium === 'ethernet') {
+        senderNotice.classList.remove('hidden');
+      } else {
+        senderNotice.classList.add('hidden');
+      }
+    }
   } catch (err) {
     console.error("loadNetworkPill error:", err);
   }
