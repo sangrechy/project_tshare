@@ -333,14 +333,6 @@ def revert_direct_ethernet() -> Dict[str, Any]:
     Signals running watchdog or directly restores network state to normal.
     Safe to call multiple times.
     """
-    # 1. Signal any running watchdog process
-    try:
-        with open(TRIGGER_FILE, "w") as f:
-            f.write("revert")
-    except Exception:
-        pass
-
-    # 2. Check backup file and execute fallback revert if watchdog was not running
     backup_path = get_backup_path()
     targets = [backup_path, BACKUP_FILE, TEMP_BACKUP_FILE]
     active_target = None
@@ -350,7 +342,19 @@ def revert_direct_ethernet() -> Dict[str, Any]:
             break
 
     if not active_target:
+        if os.path.exists(TRIGGER_FILE):
+            try:
+                os.remove(TRIGGER_FILE)
+            except Exception:
+                pass
         return {"success": True, "message": "No active temporary configuration found"}
+
+    # Signal any running watchdog process
+    try:
+        with open(TRIGGER_FILE, "w") as f:
+            f.write("revert")
+    except Exception:
+        pass
 
     try:
         with open(active_target, "r") as f:

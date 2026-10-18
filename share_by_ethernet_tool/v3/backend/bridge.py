@@ -48,27 +48,18 @@ class BridgeAPI:
         self._window = window
 
     def start_background_services(self) -> None:
-        """Starts discovery, receiver, and diagnostic services."""
+        """Starts discovery and receiver services."""
         self._receiver.start()
         self._discovery.start()
-        from .diagnostics import start_diagnostic_service
-        start_diagnostic_service()
 
     def stop_background_services(self) -> None:
         """Stops background engines and ensures temporary network settings revert."""
-        from .diagnostics import stop_diagnostic_service
-        stop_diagnostic_service()
         self._discovery.stop()
         self._receiver.stop()
         self._transfer.cancel()
         self._verify.cancel()
         from .network_config import revert_direct_ethernet
         revert_direct_ethernet()
-
-    def run_network_diagnostics(self) -> Dict[str, Any]:
-        """Provides full local diagnostics snapshot."""
-        from .diagnostics import get_system_diagnostics
-        return get_system_diagnostics()
 
     # ------------------ TELEMETRY & STATUS ------------------
 
@@ -220,7 +211,8 @@ class BridgeAPI:
         """Sender file selection dialog."""
         try:
             if self._window:
-                files = self._window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=True)
+                dialog_type = getattr(getattr(webview, 'FileDialog', None), 'OPEN', getattr(webview, 'OPEN_DIALOG', 10))
+                files = self._window.create_file_dialog(dialog_type, allow_multiple=True)
             else:
                 files = self._pick_paths_fallback(folder=False, multiple=True, title="Select Files to Send")
 
