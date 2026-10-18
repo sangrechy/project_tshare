@@ -19,6 +19,8 @@ files/*
 *.avi
 *.zip
 *.tar.gz
+!share_by_ethernet_tool/v1.zip
+!share_by_ethernet_tool/v2.zip
 
 # Logs and runtime states
 *.log
