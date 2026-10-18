@@ -323,6 +323,8 @@ function setupSendControls() {
       if (scanBadge) scanBadge.textContent = "Scanning Wi-Fi...";
       refreshDiscoveredPeers();
     });
+  }
+
   const btnSetupSender = document.getElementById('btnSetupSenderEthWire');
   if (btnSetupSender) {
     btnSetupSender.addEventListener('click', () => {
