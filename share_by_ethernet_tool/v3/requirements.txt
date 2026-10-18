@@ -1,0 +1,4 @@
+# T-Share v3 Requirements
+# Zero Samba/SMB or OpenSSL certificate dependencies.
+pywebview>=4.4.1
+psutil>=5.9.0

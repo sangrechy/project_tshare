@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T-Share v3 — High-Speed Ethernet Direct Transfer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-dark text-light antialiased select-none">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="brand-logo">
+        <svg class="icon-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="brand-title">T-SHARE <span class="badge-v3">v3.0</span></h1>
+        <p class="brand-sub">Direct Wire P2P · Zero Loss · 4MB Block Integrity</p>
+      </div>
+    </div>
+
+    <!-- 6-Tab Navigation Bar -->
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-tab="home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-tab" data-tab="send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span>Send</span>
+      </button>
+      <button class="nav-tab" data-tab="receive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Receive</span>
+      </button>
+      <button class="nav-tab" data-tab="verify">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        <span>Verify</span>
+      </button>
+      <button class="nav-tab" data-tab="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>History</span>
+      </button>
+      <button class="nav-tab" data-tab="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- Notification Banner -->
+  <div id="offerNotification" class="offer-banner hidden">
+    <div class="offer-content">
+      <div class="offer-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div>
+        <h4 id="offerTitle" class="offer-title">Incoming File Transfer</h4>
+        <p id="offerSubtitle" class="offer-desc">Peer offers 10 files (24.5 GB)</p>
+      </div>
+    </div>
+    <div class="offer-actions">
+      <button id="btnBannerAccept" class="btn-success btn-sm">Review & Accept</button>
+      <button id="btnBannerDecline" class="btn-danger btn-sm">Decline</button>
+    </div>
+  </div>
+
+  <!-- Main Viewports -->
+  <main class="main-content">
+    
+    <!-- TAB 1: HOME -->
+    <section id="tab-home" class="tab-panel active">
+      <!-- Active Transfer View (Shown when transfer is active) -->
+      <div id="homeActiveTransfer" class="transfer-dashboard hidden">
+        <div class="dashboard-header">
+          <div class="dashboard-badge-pulse" id="transferRoleBadge">TRANSMITTING (SENDER)</div>
+          <button id="btnEmergencyCancel" class="btn-danger btn-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Cancel Transfer
+          </button>
+        </div>
+
+        <!-- Big Speedometer -->
+        <div class="speed-gauge-card">
+          <div class="speed-ring">
+            <div class="speed-number" id="liveSpeedNumber">0.0</div>
+            <div class="speed-unit">MB/s</div>
+          </div>
+          <div class="speed-meta">
+            <div class="meta-item">
+              <span class="meta-label">Time Remaining (ETA)</span>
+              <span class="meta-val highlight" id="liveEtaText">--:--</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Transferred Data</span>
+              <span class="meta-val" id="liveTransferredText">0.0 GB / 0.0 GB</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Connected Peer</span>
+              <span class="meta-val" id="livePeerText">Unknown</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dual Progress Bars -->
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-title" id="liveActiveFileTitle">File: ready...</span>
+            <span class="progress-pct" id="liveOverallPct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar-fill" id="liveOverallBar" style="width: 0%;"></div>
+          </div>
+          <p class="status-subtext" id="liveStatusSubtext">Starting high-speed wire stream...</p>
+        </div>
+      </div>
+
+      <!-- Idle Hardware Telemetry View -->
+      <div id="homeHardwareView" class="hardware-overview">
+        <div class="overview-intro">
+          <h2>System Telemetry & Link Status</h2>
+          <p>Real-time link speed and hardware resources for zero-loss transfer.</p>
+        </div>
+
+        <div class="grid-cards">
+          <!-- Network Adapter Card -->
+          <div class="telemetry-card">
+            <div class="card-icon-wrap icon-cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            </div>
+            <div class="card-body">
+              <span class="card-label">Direct Ethernet Link</span>
+              <h3 class="card-val" id="telemetryIp">127.0.0.1</h3>
+              <p class="card-sub" id="telemetryAdapter">Link Speed: 1000 Mbps · Link-Local</p>
+            </div>
+          </div>
+
+          <!-- Storage Space Card -->
+          <div class="telemetry-card">
+            <div class="card-icon-wrap icon-green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <div class="card-body">
+              <span class="card-label">Available Storage</span>
+              <h3 class="card-val" id="telemetryDiskFree">0.0 GB</h3>
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" id="telemetryDiskBar" style="width: 45%;"></div>
+              </div>
+              <p class="card-sub" id="telemetryDiskSub">Destination partition</p>
+            </div>
+          </div>
+
+          <!-- CPU Load Card -->
+          <div class="telemetry-card">
+            <div class="card-icon-wrap icon-purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            </div>
+            <div class="card-body">
+              <span class="card-label">CPU Cores & Load</span>
+              <h3 class="card-val" id="telemetryCpu">0% (8 Cores)</h3>
+              <p class="card-sub">Hardware SHA-NI Acceleration Active</p>
+            </div>
+          </div>
+
+          <!-- Memory Card -->
+          <div class="telemetry-card">
+            <div class="card-icon-wrap icon-amber">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 19v-3"/><path d="M10 19v-3"/><path d="M14 19v-3"/><path d="M18 19v-3"/><rect x="2" y="5" width="20" height="11" rx="2"/></svg>
+            </div>
+            <div class="card-body">
+              <span class="card-label">Available System RAM</span>
+              <h3 class="card-val" id="telemetryRam">0.0 GB / 0.0 GB</h3>
+              <p class="card-sub">4 MB Aligned Stream Buffering</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SEND -->
+    <section id="tab-send" class="tab-panel">
+      <div class="panel-layout">
+        <!-- Left: Target & Connection -->
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">1. Connect to Receiver</h3>
+            
+            <!-- Auto-Discovery List -->
+            <div class="discovery-box">
+              <div class="box-header">
+                <span>Discovered Peers (Auto-Scan)</span>
+                <span class="badge-scan" id="scanStatusBadge">Scanning...</span>
+              </div>
+              <div class="peer-list" id="peerList">
+                <div class="empty-peers">Looking for peers on direct Ethernet cable...</div>
+              </div>
+            </div>
+
+            <!-- Manual IP Fallback -->
+            <div class="manual-connect-group">
+              <span class="field-label">Or Direct IP Fallback:</span>
+              <div class="input-row">
+                <input type="text" id="manualIpInput" class="input-field" placeholder="169.254.x.x">
+                <input type="number" id="manualPortInput" class="input-field port-field" value="52001">
+              </div>
+            </div>
+          </div>
+
+          <!-- Receiver Confirmation Display (Strictly Read-Only) -->
+          <div class="form-card">
+            <h3 class="card-title">Receiver Status</h3>
+            <div class="receiver-status-box" id="senderReceiverStatusDisplay">
+              <div class="status-indicator-dot"></div>
+              <span id="senderReceiverStatusText">Ready · Destination managed securely by receiver</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Source Selection -->
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">2. Select Source Files</h3>
+            <div class="btn-group-row">
+              <button id="btnSelectFiles" class="btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Select Files
+              </button>
+              <button id="btnSelectFolder" class="btn-secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Select Folder
+              </button>
+            </div>
+
+            <!-- Source Manifest Preview -->
+            <div class="source-summary-box">
+              <div class="summary-stat">
+                <span class="summary-val" id="selectedFileCount">0</span>
+                <span class="summary-sub">Files Selected</span>
+              </div>
+              <div class="summary-stat">
+                <span class="summary-val" id="selectedTotalSize">0.0 MB</span>
+                <span class="summary-sub">Total Payload</span>
+              </div>
+            </div>
+
+            <div class="source-path-list" id="selectedPathsList">
+              <span class="empty-path-msg">No files selected. Click above to add files or folders.</span>
+            </div>
+
+            <!-- Start Action Button -->
+            <button id="btnStartTransfer" class="btn-primary btn-large" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Start High-Speed Transfer
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: RECEIVE -->
+    <section id="tab-receive" class="tab-panel">
+      <div class="panel-layout">
+        <!-- Left: Destination Authority -->
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">1. Receiver Destination Folder</h3>
+            <p class="card-desc">You have sole authority over where incoming files are saved.</p>
+
+            <div class="destination-picker-box">
+              <input type="text" id="destinationPathInput" class="input-field" readonly placeholder="Default destination folder...">
+              <button id="btnBrowseDestination" class="btn-secondary">Browse Folder</button>
+            </div>
+
+            <!-- Collision Policy -->
+            <div class="collision-box">
+              <span class="field-label">File Collision Resolution:</span>
+              <div class="radio-options">
+                <label class="radio-label">
+                  <input type="radio" name="collisionPolicy" value="keep_both" checked>
+                  <span>Keep Both (Add suffix " (1)")</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="collisionPolicy" value="overwrite">
+                  <span>Overwrite Existing</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="collisionPolicy" value="skip">
+                  <span>Skip Duplicate Files</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Connection Pill -->
+          <div class="form-card">
+            <h3 class="card-title">2. Direct Connect Address</h3>
+            <p class="card-desc">Share this address with the sender if auto-discovery is blocked by firewall.</p>
+            <div class="connection-pill-box">
+              <span class="pill-address" id="receiverAddressPill">169.254.x.x:52001</span>
+              <button id="btnCopyAddress" class="btn-secondary btn-sm">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Incoming Transfer Review -->
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">3. Incoming Transfer Proposal</h3>
+            
+            <div id="receivePendingCard" class="pending-offer-card empty">
+              <div class="empty-state-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <h4 id="receiveOfferHeading">Listening for Sender...</h4>
+              <p id="receiveOfferDesc">When a sender connects, transfer details will appear here for your approval.</p>
+
+              <div id="receiveDecisionButtons" class="btn-group-row hidden">
+                <button id="btnAcceptReceive" class="btn-success">Accept & Begin Transfer</button>
+                <button id="btnRejectReceive" class="btn-danger">Decline</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: VERIFY -->
+    <section id="tab-verify" class="tab-panel">
+      <div class="panel-layout">
+        <!-- Dual Ledger Columns -->
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">Sender History Ledger</h3>
+            <div class="ledger-list" id="senderLedgerList">
+              <div class="empty-ledger">No sender sessions recorded yet.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-column">
+          <div class="form-card">
+            <h3 class="card-title">Receiver History Ledger</h3>
+            <div class="ledger-list" id="receiverLedgerList">
+              <div class="empty-ledger">No receiver sessions recorded yet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification Runner Panel -->
+      <div class="form-card verify-runner-card">
+        <div class="runner-header">
+          <div>
+            <h3 class="card-title">Cryptographic Integrity Auditor</h3>
+            <p class="card-desc">Verify that all bytes on disk exactly match without corruption.</p>
+          </div>
+          <div class="verify-controls">
+            <select id="verifyModeSelect" class="select-field">
+              <option value="quick_parity">Mode 1: Quick Parity (Instant Metadata Audit)</option>
+              <option value="full_crypto">Mode 2: Full Cryptographic SHA-256 (Exhaustive Disk Read)</option>
+            </select>
+            <button id="btnRunVerification" class="btn-primary" disabled>Start Audit</button>
+          </div>
+        </div>
+
+        <!-- Verification Live Results -->
+        <div id="verifyLiveProgress" class="verify-progress-box hidden">
+          <div class="progress-header">
+            <span id="verifyCurrentFileText">Reading blocks...</span>
+            <span id="verifySpeedText">0.0 MB/s</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-bar-fill" id="verifyProgressBar" style="width: 0%;"></div>
+          </div>
+          <p class="verify-details" id="verifyDetailsText">Audit running...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: HISTORY -->
+    <section id="tab-history" class="tab-panel">
+      <div class="form-card history-card">
+        <div class="history-header">
+          <h3 class="card-title">Completed & Past Sessions</h3>
+          <span class="session-count-badge" id="historySessionCount">0 Transfers</span>
+        </div>
+
+        <div class="table-container">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Session ID</th>
+                <th>Role</th>
+                <th>Peer</th>
+                <th>Files</th>
+                <th>Total Size</th>
+                <th>Avg Speed</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <tr>
+                <td colspan="9" class="empty-table-cell">No transfer records found.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: SETTINGS -->
+    <section id="tab-settings" class="tab-panel">
+      <div class="form-card settings-card">
+        <div class="settings-header">
+          <div>
+            <h3 class="card-title">Hardware Resource Governor</h3>
+            <p class="card-desc">Configure system resources allocated to 500 GB file transfers.</p>
+          </div>
+          <!-- Master Full Power Toggle -->
+          <div class="toggle-wrap">
+            <label class="switch">
+              <input type="checkbox" id="toggleFullResources" checked>
+              <span class="slider round"></span>
+            </label>
+            <span class="toggle-label">Use Full System Resources</span>
+          </div>
+        </div>
+
+        <!-- 4 Resource Sliders -->
+        <div class="sliders-grid">
+          <!-- Slider 1: RAM Buffer -->
+          <div class="slider-control">
+            <div class="slider-meta">
+              <span class="slider-title">RAM Stream Buffer</span>
+              <span class="slider-val" id="valRamBuffer">512 MB</span>
+            </div>
+            <input type="range" id="sliderRamBuffer" min="64" max="2048" step="64" value="512" class="range-slider">
+            <p class="slider-hint">In-memory buffer for assembling 4 MB SHA-256 blocks.</p>
+          </div>
+
+          <!-- Slider 2: CPU Duty Cycle -->
+          <div class="slider-control">
+            <div class="slider-meta">
+              <span class="slider-title">CPU Duty Cycle</span>
+              <span class="slider-val" id="valCpuDuty">100%</span>
+            </div>
+            <input type="range" id="sliderCpuDuty" min="25" max="100" step="5" value="100" class="range-slider">
+            <p class="slider-hint">Controls cryptographic hashing thread priority.</p>
+          </div>
+
+          <!-- Slider 3: Worker Threads -->
+          <div class="slider-control">
+            <div class="slider-meta">
+              <span class="slider-title">I/O Worker Threads</span>
+              <span class="slider-val" id="valWorkerThreads">4 Threads</span>
+            </div>
+            <input type="range" id="sliderWorkerThreads" min="1" max="16" step="1" value="4" class="range-slider">
+            <p class="slider-hint">Parallel disk pre-fetching and checksumming.</p>
+          </div>
+
+          <!-- Slider 4: Network Bandwidth Limiter -->
+          <div class="slider-control">
+            <div class="slider-meta">
+              <span class="slider-title">Network Bandwidth Cap</span>
+              <span class="slider-val" id="valBandwidthLimit">Uncapped (Max Wire Speed)</span>
+            </div>
+            <input type="range" id="sliderBandwidthLimit" min="0" max="125" step="5" value="0" class="range-slider">
+            <p class="slider-hint">0 = Uncapped (Up to 1 Gbps wire speed).</p>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="btnSaveSettings" class="btn-primary">Apply Settings</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
