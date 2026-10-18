@@ -1,6 +1,7 @@
 /**
  * T-Share v3 Frontend Application Logic
  * High-speed direct Ethernet file transfer interface.
+ * Strictly real metrics, zero mock data.
  */
 
 // Application State
@@ -20,27 +21,29 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSettingsControls();
   setupEmergencyControls();
 
-  // Wait for PyWebView bridge injection
-  window.addEventListener('pywebviewready', () => {
-    initApp();
-  });
+  // Listen for manual IP changes to update target status in real time
+  const manualIp = document.getElementById('manualIpInput');
+  const manualPort = document.getElementById('manualPortInput');
+  if (manualIp) manualIp.addEventListener('input', updateTargetReceiverStatus);
+  if (manualPort) manualPort.addEventListener('input', updateTargetReceiverStatus);
 
-  // Fallback if running directly in browser for UI preview
-  setTimeout(() => {
-    if (!window.pywebview) {
-      console.warn("PyWebView bridge not detected. Mocking telemetry for standalone preview.");
-      initMockPreview();
-    }
-  }, 1000);
+  // Initialize immediately if pywebview is already present
+  if (window.pywebview && window.pywebview.api) {
+    initApp();
+  } else {
+    window.addEventListener('pywebviewready', () => {
+      initApp();
+    });
+  }
 });
 
 function initApp() {
-  // Load initial network and settings
   loadNetworkPill();
   loadSettings();
   loadHistory();
 
   // Start 250ms throttled telemetry polling loop
+  if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(updateTelemetry, 250);
 }
 
@@ -76,6 +79,8 @@ function switchTab(tabName) {
     loadVerifyLedgers();
   } else if (tabName === 'receive') {
     loadNetworkPill();
+  } else if (tabName === 'send') {
+    updateTargetReceiverStatus();
   }
 }
 
@@ -92,10 +97,12 @@ async function updateTelemetry() {
     const transfer = data.transfer;
     const role = data.active_role;
 
-    // 1. Update Hardware Overview Cards (if visible)
+    // 1. Update Hardware Overview Cards
     if (hw) {
       if (hw.network && hw.network.primary_ip) {
         document.getElementById('telemetryIp').textContent = hw.network.primary_ip;
+        const senderIpEl = document.getElementById('senderNodeIp');
+        if (senderIpEl) senderIpEl.textContent = `Local IP: ${hw.network.primary_ip}`;
       }
       if (hw.disk) {
         document.getElementById('telemetryDiskFree').textContent = `${hw.disk.free_gb} GB Free`;
@@ -162,6 +169,40 @@ async function updateTelemetry() {
       document.getElementById('homeHardwareView').classList.remove('hidden');
     }
 
+    // 4. Update Send Tab Honest Connection Status Nodes
+    const sDot = document.getElementById('senderStatusDot');
+    const sText = document.getElementById('senderStatusText');
+    const rDot = document.getElementById('receiverStatusDot');
+    const rText = document.getElementById('receiverStatusText');
+    const rSub = document.getElementById('receiverNodeTarget');
+
+    if (sDot && sText && rDot && rText && rSub) {
+      if (role === 'sender' && isTransferActive) {
+        sDot.className = 'status-indicator-dot dot-connected';
+        sText.textContent = `Streaming (${transfer.status})`;
+
+        rDot.className = 'status-indicator-dot dot-connected';
+        rText.textContent = `Connected (${transfer.peer_name || 'Receiver'})`;
+        rSub.textContent = `Wire transfer active · ${transfer.speed_mbps.toFixed(1)} MB/s`;
+      } else if (role === 'sender' && transfer.status === 'completed') {
+        sDot.className = 'status-indicator-dot dot-idle';
+        sText.textContent = 'Idle (Transfer Finished)';
+
+        rDot.className = 'status-indicator-dot dot-connected';
+        rText.textContent = 'Completed';
+        rSub.textContent = 'Transfer completed successfully';
+      } else if (role === 'sender' && transfer.status === 'rejected') {
+        sDot.className = 'status-indicator-dot dot-idle';
+        sText.textContent = 'Ready (Offer Declined)';
+
+        rDot.className = 'status-indicator-dot dot-disconnected';
+        rText.textContent = 'Declined';
+        rSub.textContent = transfer.receiver_status || 'Peer declined transfer';
+      } else {
+        updateTargetReceiverStatus();
+      }
+    }
+
     // Refresh Send Tab Discovery list if on send tab
     if (activeTab === 'send') {
       refreshDiscoveredPeers();
@@ -169,6 +210,36 @@ async function updateTelemetry() {
 
   } catch (err) {
     console.error("Telemetry error:", err);
+  }
+}
+
+function updateTargetReceiverStatus() {
+  const manualIp = document.getElementById('manualIpInput');
+  const manualPort = document.getElementById('manualPortInput');
+  const targetIp = (manualIp ? manualIp.value.trim() : '') || selectedTargetIp;
+  const targetPort = (manualPort ? manualPort.value.trim() : '') || selectedTargetPort;
+
+  const sDot = document.getElementById('senderStatusDot');
+  const sText = document.getElementById('senderStatusText');
+  const rDot = document.getElementById('receiverStatusDot');
+  const rText = document.getElementById('receiverStatusText');
+  const rSub = document.getElementById('receiverNodeTarget');
+
+  if (sDot && sText) {
+    sDot.className = 'status-indicator-dot dot-idle';
+    sText.textContent = 'Idle (Ready)';
+  }
+
+  if (rDot && rText && rSub) {
+    if (targetIp) {
+      rDot.className = 'status-indicator-dot dot-disconnected';
+      rText.textContent = 'Not Connected';
+      rSub.textContent = `Target: ${targetIp}:${targetPort} (Ready to connect)`;
+    } else {
+      rDot.className = 'status-indicator-dot dot-disconnected';
+      rText.textContent = 'Disconnected';
+      rSub.textContent = 'No target peer selected';
+    }
   }
 }
 
@@ -196,10 +267,17 @@ function setupSendControls() {
       return;
     }
 
+    const rText = document.getElementById('receiverStatusText');
+    const rSub = document.getElementById('receiverNodeTarget');
+    if (rText) rText.textContent = 'Connecting...';
+    if (rSub) rSub.textContent = `Opening TCP socket to ${ip}:${port}...`;
+
     const res = await window.pywebview.api.start_transfer(ip, port);
     if (res && res.success) {
       switchTab('home');
     } else {
+      if (rText) rText.textContent = 'Connection Failed';
+      if (rSub) rSub.textContent = res.error || 'Connection refused';
       alert(`Transfer failed to start: ${res.error || 'Unknown error'}`);
     }
   });
@@ -208,7 +286,7 @@ function setupSendControls() {
 function updateSourceSelectionUI(summary) {
   if (!summary) return;
   document.getElementById('selectedFileCount').textContent = summary.count || 0;
-  
+
   if (summary.total_bytes >= 1024 ** 3) {
     document.getElementById('selectedTotalSize').textContent = `${(summary.total_bytes / (1024 ** 3)).toFixed(2)} GB`;
   } else {
@@ -260,6 +338,7 @@ async function refreshDiscoveredPeers() {
         selectedTargetPort = peer.port;
         document.getElementById('manualIpInput').value = peer.ip;
         document.getElementById('manualPortInput').value = peer.port;
+        updateTargetReceiverStatus();
         refreshDiscoveredPeers();
       });
 
@@ -312,7 +391,7 @@ function showIncomingOffer(offer) {
   currentPendingOffer = offer;
   const banner = document.getElementById('offerNotification');
   const sizeGB = (offer.total_bytes / (1024 ** 3)).toFixed(2);
-  
+
   document.getElementById('offerTitle').textContent = `Incoming: ${offer.root_name || 'File Transfer'}`;
   document.getElementById('offerSubtitle').textContent = `From ${offer.peer_name} (${offer.peer_ip}) · ${offer.total_files} files (${sizeGB} GB)`;
   banner.classList.remove('hidden');
@@ -334,7 +413,6 @@ function hideIncomingOffer() {
 async function acceptCurrentOffer() {
   let dest = document.getElementById('destinationPathInput').value.trim();
   if (!dest) {
-    // Prompt to select destination
     const res = await window.pywebview.api.select_destination_folder();
     if (!res || !res.path) {
       alert("Please select a destination folder to receive files.");
@@ -394,7 +472,7 @@ async function loadVerifyLedgers() {
   if (!window.pywebview) return;
   try {
     const ledger = await window.pywebview.api.get_verify_ledger();
-    
+
     // Sender Ledger
     const sList = document.getElementById('senderLedgerList');
     sList.innerHTML = '';
@@ -584,12 +662,4 @@ function setupEmergencyControls() {
       }
     }
   });
-}
-
-// Mock fallback for standalone browser preview
-function initMockPreview() {
-  document.getElementById('telemetryIp').textContent = "169.254.101.44 (Direct Wire)";
-  document.getElementById('telemetryDiskFree').textContent = "420.5 GB Free";
-  document.getElementById('telemetryCpu').textContent = "4% (16 Cores)";
-  document.getElementById('telemetryRam').textContent = "24.2 GB / 32.0 GB";
 }

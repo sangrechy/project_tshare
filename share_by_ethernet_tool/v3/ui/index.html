@@ -208,12 +208,29 @@
             </div>
           </div>
 
-          <!-- Receiver Confirmation Display (Strictly Read-Only) -->
+          <!-- Real Connection Status (Truth only - No Mocks) -->
           <div class="form-card">
-            <h3 class="card-title">Receiver Status</h3>
-            <div class="receiver-status-box" id="senderReceiverStatusDisplay">
-              <div class="status-indicator-dot"></div>
-              <span id="senderReceiverStatusText">Ready · Destination managed securely by receiver</span>
+            <h3 class="card-title">Real Connection Status</h3>
+            <div class="status-nodes-grid">
+              <!-- Local Sender Box -->
+              <div class="status-node-box">
+                <div class="node-header">
+                  <span class="node-label">Local Sender</span>
+                  <div class="status-indicator-dot dot-idle" id="senderStatusDot"></div>
+                </div>
+                <div class="node-val" id="senderStatusText">Idle (Ready)</div>
+                <div class="node-sub" id="senderNodeIp">Local IP: Detecting...</div>
+              </div>
+
+              <!-- Remote Receiver Box -->
+              <div class="status-node-box">
+                <div class="node-header">
+                  <span class="node-label">Remote Receiver</span>
+                  <div class="status-indicator-dot dot-disconnected" id="receiverStatusDot"></div>
+                </div>
+                <div class="node-val text-muted" id="receiverStatusText">Disconnected</div>
+                <div class="node-sub" id="receiverNodeTarget">No peer connected yet</div>
+              </div>
             </div>
           </div>
         </div>
@@ -251,8 +268,11 @@
 
             <!-- Start Action Button -->
             <button id="btnStartTransfer" class="btn-primary btn-large" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              Start High-Speed Transfer
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              <span>Start High-Speed Transfer</span>
             </button>
           </div>
         </div>
