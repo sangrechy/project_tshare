@@ -78,6 +78,7 @@ class ReceiverEngine:
             file_entries: list[tuple[float, str, int]] = []  # (mtime, rel_path, size)
 
             try:
+                scanned_count = 0
                 for root, _, files in os.walk(self.target_folder):
                     for f in files:
                         full_path = os.path.join(root, f)
@@ -90,8 +91,13 @@ class ReceiverEngine:
                             current_snapshot[full_path] = size
                             rel_path = os.path.relpath(full_path, self.target_folder)
                             file_entries.append((mtime, rel_path, size))
+                            scanned_count += 1
+                            if scanned_count >= 5000:
+                                break
                         except (OSError, PermissionError):
                             continue
+                    if scanned_count >= 5000:
+                        break
             except Exception:
                 pass
 

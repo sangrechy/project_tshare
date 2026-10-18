@@ -10,32 +10,54 @@ import re
 import shutil
 import socket
 import subprocess
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
+_LOCK = threading.Lock()
+_CACHED_MACHINE_INFO: dict[str, Any] | None = None
+_CACHED_ADAPTERS: list[dict[str, Any]] = []
+_ADAPTERS_TIMESTAMP: float = 0.0
+_CACHED_DRIVES: list[dict[str, Any]] = []
+_DRIVES_TIMESTAMP: float = 0.0
+
 
 def get_machine_info() -> dict[str, Any]:
+    global _CACHED_MACHINE_INFO
+    with _LOCK:
+        if _CACHED_MACHINE_INFO is not None:
+            return _CACHED_MACHINE_INFO
+
     hostname = socket.gethostname()
     try:
         primary_ip = socket.gethostbyname(hostname)
     except Exception:
         primary_ip = "127.0.0.1"
 
-    return {
+    info = {
         "hostname": hostname,
         "username": os.environ.get("USER", "user"),
         "primary_ip": primary_ip,
         "os": "macOS (Darwin)",
     }
+    with _LOCK:
+        _CACHED_MACHINE_INFO = info
+    return info
 
 
 def get_network_adapters() -> list[dict[str, Any]]:
+    global _CACHED_ADAPTERS, _ADAPTERS_TIMESTAMP
+    now = time.time()
+    with _LOCK:
+        if _CACHED_ADAPTERS and (now - _ADAPTERS_TIMESTAMP < 15.0):
+            return list(_CACHED_ADAPTERS)
+
     adapters: list[dict[str, Any]] = []
     dev_map: dict[str, dict[str, str]] = {}
 
     # 1. Query hardware ports via networksetup
     try:
-        raw = subprocess.check_output(["networksetup", "-listallhardwareports"], text=True, stderr=subprocess.DEVNULL, timeout=4)
+        raw = subprocess.check_output(["networksetup", "-listallhardwareports"], text=True, stderr=subprocess.DEVNULL, timeout=3)
         cur_port = ""
         for line in raw.splitlines():
             line = line.strip()
@@ -80,7 +102,10 @@ def get_network_adapters() -> list[dict[str, Any]]:
         pass
 
     adapters.sort(key=lambda a: (not a["is_up"], not a["is_ethernet"], a["name"]))
-    return adapters
+    with _LOCK:
+        _CACHED_ADAPTERS = adapters
+        _ADAPTERS_TIMESTAMP = now
+        return list(_CACHED_ADAPTERS)
 
 
 def _append_mac_adapter(adapters: list, name: str, data: dict, dev_map: dict) -> None:
@@ -103,6 +128,12 @@ def _append_mac_adapter(adapters: list, name: str, data: dict, dev_map: dict) ->
 
 
 def get_disk_drives() -> list[dict[str, Any]]:
+    global _CACHED_DRIVES, _DRIVES_TIMESTAMP
+    now = time.time()
+    with _LOCK:
+        if _CACHED_DRIVES and (now - _DRIVES_TIMESTAMP < 6.0):
+            return list(_CACHED_DRIVES)
+
     drives: list[dict[str, Any]] = []
     mounts = ["/"]
     vols = "/Volumes"
@@ -129,7 +160,10 @@ def get_disk_drives() -> list[dict[str, Any]]:
         except (PermissionError, OSError):
             pass
 
-    return drives
+    with _LOCK:
+        _CACHED_DRIVES = drives
+        _DRIVES_TIMESTAMP = now
+        return list(_CACHED_DRIVES)
 
 
 def measure_tcp_latency(host_or_path: str, port: int = 445, timeout: float = 1.2) -> float | None:

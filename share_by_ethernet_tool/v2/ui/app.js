@@ -40,19 +40,19 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pywebviewready', onBridgeReady);
   }
 
-  // Periodic Telemetry Loop (every 500ms for smooth 60fps feel)
-  setInterval(pollSystemTelemetry, 500);
+  // Adaptive Non-Overlapping Telemetry Loop
+  scheduleNextTelemetry(200);
 
   // Initial load
   setTimeout(() => {
-    refreshSystemOverview();
+    refreshSystemOverview(true);
     loadHistory();
-  }, 200);
+  }, 250);
 });
 
 function onBridgeReady() {
   console.log('[T-Share v2] Native PyWebView Bridge Connected.');
-  refreshSystemOverview();
+  refreshSystemOverview(true);
   loadHistory();
 }
 
@@ -66,13 +66,13 @@ function setupSvgRing() {
 
 function initSparklineCanvas() {
   sparklineCanvas = document.getElementById('speedSparkline');
-  if (sparklineCanvas) {
+  if (sparklineCanvas && sparklineCanvas.clientWidth > 0 && sparklineCanvas.clientHeight > 0) {
     sparklineCtx = sparklineCanvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     sparklineCanvas.width = sparklineCanvas.clientWidth * dpr;
     sparklineCanvas.height = sparklineCanvas.clientHeight * dpr;
     sparklineCtx.scale(dpr, dpr);
-    renderSparkline([]);
+    renderSparkline(state.speedHistory || []);
   }
 }
 
@@ -112,9 +112,17 @@ function switchTab(tabKey) {
 // ==========================================================================
 
 let startupCleanupNotified = false;
+let isOverviewFetching = false;
+let lastOverviewFetchTime = 0;
 
-async function refreshSystemOverview() {
+async function refreshSystemOverview(force = false) {
   if (!window.pywebview || !window.pywebview.api) return;
+  const now = Date.now();
+  if (!force && (now - lastOverviewFetchTime < 3000)) return; // Debounce rapid tab switches
+  if (isOverviewFetching) return;
+  isOverviewFetching = true;
+  lastOverviewFetchTime = now;
+
   try {
     const data = await window.pywebview.api.get_system_overview();
     if (!data) return;
@@ -194,41 +202,66 @@ async function refreshSystemOverview() {
 
   } catch (err) {
     console.error('refreshSystemOverview error:', err);
+  } finally {
+    isOverviewFetching = false;
   }
 }
 
-async function pollSystemTelemetry() {
-  if (!window.pywebview || !window.pywebview.api) return;
+let isPollingTelemetry = false;
+
+async function runTelemetryCycle() {
+  if (isPollingTelemetry) return;
+  isPollingTelemetry = true;
+  let nextDelay = 800; // Default idle polling frequency
 
   try {
-    // 1. Transfer Telemetry
-    const tData = await window.pywebview.api.get_transfer_telemetry();
-    if (tData) {
-      applyTransferTelemetry(tData);
-    }
-
-    // 2. Verifier Telemetry
-    if (state.isVerifyRunning || state.activeTab === 'verify') {
-      const vData = await window.pywebview.api.get_verifier_status();
-      if (vData) {
-        applyVerifierTelemetry(vData);
+    if (window.pywebview && window.pywebview.api) {
+      // 1. Transfer Telemetry (fast in-memory read)
+      if (state.isTransferRunning || state.activeTab === 'send') {
+        const tData = await window.pywebview.api.get_transfer_telemetry();
+        if (tData) {
+          applyTransferTelemetry(tData);
+        }
+        if (state.isTransferRunning) {
+          nextDelay = 400; // 60fps telemetry during active copy
+        }
       }
-    }
 
-    // 3. Receiver Telemetry
-    if (state.isReceiverMonitoring || state.activeTab === 'receive') {
-      const rData = await window.pywebview.api.get_receiver_status();
-      if (rData) {
-        applyReceiverTelemetry(rData);
+      // 2. Verifier Telemetry
+      if (state.isVerifyRunning || state.activeTab === 'verify') {
+        const vData = await window.pywebview.api.get_verifier_status();
+        if (vData) {
+          applyVerifierTelemetry(vData);
+        }
+        if (state.isVerifyRunning) {
+          nextDelay = 400;
+        }
       }
+
+      // 3. Receiver Telemetry
+      if (state.isReceiverMonitoring || state.activeTab === 'receive') {
+        const rData = await window.pywebview.api.get_receiver_status();
+        if (rData) {
+          applyReceiverTelemetry(rData);
+        }
+        if (state.isReceiverMonitoring) {
+          nextDelay = 600;
+        }
+      }
+
+      // Update Header Pill
+      updateSystemPill();
     }
-
-    // Update Header Pill
-    updateSystemPill();
-
   } catch (err) {
-    // ignore polling hiccups
+    // Ignore transient IPC hiccups
+  } finally {
+    isPollingTelemetry = false;
+    scheduleNextTelemetry(nextDelay);
   }
+}
+
+function scheduleNextTelemetry(ms) {
+  setTimeout(runTelemetryCycle, ms);
 }
 
 function updateSystemPill() {

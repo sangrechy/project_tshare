@@ -231,6 +231,13 @@ class TransferEngine:
         self.retry_wait = 2
         self.auto_verify_on_finish = False
 
+        # Cached reachability and storage metrics (updated in background)
+        self.source_reachable = False
+        self.dest_reachable = False
+        self.source_disk: dict[str, Any] | None = None
+        self.dest_disk: dict[str, Any] | None = None
+        self._last_disk_sample_time: float = 0.0
+
         # Logs & Threads
         self.log_queue: queue.Queue[tuple[str, str]] = queue.Queue(maxsize=1000)
         self._reader_thread: threading.Thread | None = None
@@ -611,7 +618,47 @@ class TransferEngine:
                 else:
                     self.eta_seconds = 0.0
 
+            # Periodic background disk capacity check (every 5 seconds)
+            self._update_reachability_and_disk()
+
             self.last_sample_time = now
+
+    def _update_reachability_and_disk(self) -> None:
+        """Query disk capacities and path reachability in background without blocking telemetry."""
+        now = time.time()
+        if self._last_disk_sample_time > 0 and (now - self._last_disk_sample_time < 5.0):
+            return
+        self._last_disk_sample_time = now
+
+        if self.source_path:
+            try:
+                self.source_reachable = os.path.exists(self.source_path)
+                if self.source_reachable:
+                    du = shutil.disk_usage(self.source_path)
+                    self.source_disk = {"total": du.total, "used": du.used, "free": du.free}
+                else:
+                    self.source_disk = None
+            except Exception:
+                self.source_reachable = False
+                self.source_disk = None
+        else:
+            self.source_reachable = False
+            self.source_disk = None
+
+        if self.dest_path:
+            try:
+                self.dest_reachable = os.path.exists(self.dest_path)
+                if self.dest_reachable:
+                    du = shutil.disk_usage(self.dest_path)
+                    self.dest_disk = {"total": du.total, "used": du.used, "free": du.free}
+                else:
+                    self.dest_disk = None
+            except Exception:
+                self.dest_reachable = False
+                self.dest_disk = None
+        else:
+            self.dest_reachable = False
+            self.dest_disk = None
 
     def start_background_scan(self) -> None:
         """Run non-blocking file count & byte calculation on source."""
@@ -644,7 +691,7 @@ class TransferEngine:
             self.scan_busy = False
 
     def get_telemetry(self) -> dict[str, Any]:
-        """Aggregate all real-time stats for the GUI."""
+        """Aggregate all real-time stats for the GUI (Instant 0ms in-memory read)."""
         is_running = self.is_managed_running()
         now = time.time()
         elapsed = (now - self.transfer_start_time) if (is_running and self.transfer_start_time) else 0.0
@@ -653,25 +700,9 @@ class TransferEngine:
         if self.source_total_bytes > 0:
             pct = min(100.0, round((self.dest_copied_bytes / self.source_total_bytes) * 100.0, 1))
 
-        # Check reachability and disk capacity
-        source_reachable = os.path.exists(self.source_path) if self.source_path else False
-        dest_reachable = os.path.exists(self.dest_path) if self.dest_path else False
-
-        source_disk = None
-        if self.source_path and source_reachable:
-            try:
-                du = shutil.disk_usage(self.source_path)
-                source_disk = {"total": du.total, "used": du.used, "free": du.free}
-            except Exception:
-                pass
-
-        dest_disk = None
-        if self.dest_path and dest_reachable:
-            try:
-                du = shutil.disk_usage(self.dest_path)
-                dest_disk = {"total": du.total, "used": du.used, "free": du.free}
-            except Exception:
-                pass
+        # Initial background sample if not yet done
+        if self._last_disk_sample_time == 0.0:
+            threading.Thread(target=self._update_reachability_and_disk, daemon=True).start()
 
         dest_mbps = round((self.current_download_speed / (1024 * 1024)), 2)
 
@@ -681,10 +712,10 @@ class TransferEngine:
             "managed_pid": self.managed_pid,
             "source_path": self.source_path,
             "dest_path": self.dest_path,
-            "source_reachable": source_reachable,
-            "dest_reachable": dest_reachable,
-            "source_disk": source_disk,
-            "dest_disk": dest_disk,
+            "source_reachable": self.source_reachable,
+            "dest_reachable": self.dest_reachable,
+            "source_disk": self.source_disk,
+            "dest_disk": self.dest_disk,
             "current_file": self.current_file,
             "current_folder": os.path.basename(self.source_path.rstrip(r"\/")) or "Source",
             "source_total_bytes": self.source_total_bytes,

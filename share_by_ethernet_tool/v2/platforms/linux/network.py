@@ -11,32 +11,54 @@ import re
 import shutil
 import socket
 import subprocess
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
+_LOCK = threading.Lock()
+_CACHED_MACHINE_INFO: dict[str, Any] | None = None
+_CACHED_ADAPTERS: list[dict[str, Any]] = []
+_ADAPTERS_TIMESTAMP: float = 0.0
+_CACHED_DRIVES: list[dict[str, Any]] = []
+_DRIVES_TIMESTAMP: float = 0.0
+
 
 def get_machine_info() -> dict[str, Any]:
+    global _CACHED_MACHINE_INFO
+    with _LOCK:
+        if _CACHED_MACHINE_INFO is not None:
+            return _CACHED_MACHINE_INFO
+
     hostname = socket.gethostname()
     try:
         primary_ip = socket.gethostbyname(hostname)
     except Exception:
         primary_ip = "127.0.0.1"
 
-    return {
+    info = {
         "hostname": hostname,
         "username": os.environ.get("USER", "user"),
         "primary_ip": primary_ip,
         "os": "Linux",
     }
+    with _LOCK:
+        _CACHED_MACHINE_INFO = info
+    return info
 
 
 def get_network_adapters() -> list[dict[str, Any]]:
+    global _CACHED_ADAPTERS, _ADAPTERS_TIMESTAMP
+    now = time.time()
+    with _LOCK:
+        if _CACHED_ADAPTERS and (now - _ADAPTERS_TIMESTAMP < 15.0):
+            return list(_CACHED_ADAPTERS)
+
     adapters: list[dict[str, Any]] = []
     ip_map: dict[str, list[str]] = {}
 
     # Query IP addresses via 'ip -j addr'
     try:
-        res = subprocess.run(["ip", "-j", "addr"], capture_output=True, text=True, timeout=4)
+        res = subprocess.run(["ip", "-j", "addr"], capture_output=True, text=True, timeout=3)
         if res.returncode == 0 and res.stdout.strip():
             data = json.loads(res.stdout.strip())
             for iface in data:
@@ -105,10 +127,19 @@ def get_network_adapters() -> list[dict[str, Any]]:
             )
 
     adapters.sort(key=lambda a: (not a["is_up"], not a["is_ethernet"], a["name"]))
-    return adapters
+    with _LOCK:
+        _CACHED_ADAPTERS = adapters
+        _ADAPTERS_TIMESTAMP = now
+        return list(_CACHED_ADAPTERS)
 
 
 def get_disk_drives() -> list[dict[str, Any]]:
+    global _CACHED_DRIVES, _DRIVES_TIMESTAMP
+    now = time.time()
+    with _LOCK:
+        if _CACHED_DRIVES and (now - _DRIVES_TIMESTAMP < 6.0):
+            return list(_CACHED_DRIVES)
+
     drives: list[dict[str, Any]] = []
     checked_mounts = set()
 
@@ -146,7 +177,10 @@ def get_disk_drives() -> list[dict[str, Any]]:
         except (PermissionError, OSError):
             pass
 
-    return drives
+    with _LOCK:
+        _CACHED_DRIVES = drives
+        _DRIVES_TIMESTAMP = now
+        return list(_CACHED_DRIVES)
 
 
 def measure_tcp_latency(host_or_path: str, port: int = 445, timeout: float = 1.2) -> float | None:
