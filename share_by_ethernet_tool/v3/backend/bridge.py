@@ -260,13 +260,17 @@ class BridgeAPI:
         if not self._selected_source_paths:
             return {"success": False, "error": "No source files or folder selected"}
 
-        rate_limit = self._settings.get("bandwidth_limit_mbps", 0)
+        if self._settings.get("use_full_resources", True):
+            rate_limit = 0.0
+        else:
+            rate_limit = float(self._settings.get("bandwidth_limit_mbps", 0.0))
+
         try:
             self._transfer.start_transfer(
                 target_ip=target_ip.strip(),
                 target_port=int(target_port),
                 source_paths=self._selected_source_paths,
-                rate_limit_mbps=float(rate_limit)
+                rate_limit_mbps=rate_limit
             )
             return {"success": True}
         except Exception as e:

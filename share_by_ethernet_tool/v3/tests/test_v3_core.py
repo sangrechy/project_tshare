@@ -227,6 +227,102 @@ class TestTSHAREV3(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_11_high_throughput_streaming(self):
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
+            test_file = os.path.join(src, 'benchmark_32mb.bin')
+            size_bytes = 32 * 1024 * 1024  # 32 MB (8 blocks)
+            raw_bytes = os.urandom(size_bytes)
+            with open(test_file, 'wb') as f:
+                f.write(raw_bytes)
+
+            recv = ReceiverEngine(port=52055)
+            recv.start()
+
+            def auto_accept():
+                while recv.status != 'waiting_user':
+                    time.sleep(0.01)
+                recv.accept_transfer(dst, 'overwrite')
+
+            threading.Thread(target=auto_accept, daemon=True).start()
+
+            t0 = time.time()
+            sender = TransferEngine()
+            sender.start_transfer('127.0.0.1', 52055, [test_file])
+            sender._thread.join(timeout=10)
+
+            t_end = time.time()
+            recv_timeout = 5
+            st = time.time()
+            while recv.status != 'completed' and time.time() - st < recv_timeout:
+                time.sleep(0.02)
+
+            duration = max(0.001, t_end - t0)
+            mbps = (size_bytes / duration) / (1024 * 1024)
+            print(f"\n[BENCHMARK] 32 MB streamed in {duration:.3f}s -> {mbps:.2f} MB/s")
+
+            self.assertEqual(sender.status, 'completed')
+            self.assertEqual(recv.status, 'completed')
+            self.assertGreater(mbps, 50.0)
+            recv.stop()
+
+            out_file = os.path.join(dst, 'benchmark_32mb.bin')
+            self.assertTrue(os.path.exists(out_file))
+            with open(out_file, 'rb') as f:
+                self.assertEqual(f.read(), raw_bytes)
+
+    def test_12_multi_file_batch_streaming(self):
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
+            # Create a mix of files: empty, small, medium, and subfolder
+            f_empty = os.path.join(src, 'empty.txt')
+            with open(f_empty, 'wb') as f:
+                pass
+
+            f_small = os.path.join(src, 'small.txt')
+            with open(f_small, 'wb') as f:
+                f.write(b'Small file payload text')
+
+            sub = os.path.join(src, 'subfolder')
+            os.makedirs(sub)
+            f_sub = os.path.join(sub, 'data.bin')
+            sub_payload = os.urandom(5 * 1024 * 1024)  # 5 MB
+            with open(f_sub, 'wb') as f:
+                f.write(sub_payload)
+
+            recv = ReceiverEngine(port=52066)
+            recv.start()
+
+            def auto_accept():
+                while recv.status != 'waiting_user':
+                    time.sleep(0.01)
+                recv.accept_transfer(dst, 'overwrite')
+
+            threading.Thread(target=auto_accept, daemon=True).start()
+
+            sender = TransferEngine()
+            sender.start_transfer('127.0.0.1', 52066, [src])
+            sender._thread.join(timeout=10)
+
+            st = time.time()
+            while recv.status != 'completed' and time.time() - st < 5:
+                time.sleep(0.02)
+
+            self.assertEqual(sender.status, 'completed')
+            self.assertEqual(recv.status, 'completed')
+            recv.stop()
+
+            # Verify files in destination
+            root_folder = os.path.basename(src)
+            dest_root = os.path.join(dst, root_folder)
+            self.assertTrue(os.path.exists(os.path.join(dest_root, 'empty.txt')))
+            self.assertTrue(os.path.exists(os.path.join(dest_root, 'small.txt')))
+            with open(os.path.join(dest_root, 'small.txt'), 'rb') as f:
+                self.assertEqual(f.read(), b'Small file payload text')
+
+            dest_sub = os.path.join(dest_root, 'subfolder', 'data.bin')
+            self.assertTrue(os.path.exists(dest_sub))
+            with open(dest_sub, 'rb') as f:
+                self.assertEqual(f.read(), sub_payload)
+
 
 if __name__ == '__main__':
     unittest.main()

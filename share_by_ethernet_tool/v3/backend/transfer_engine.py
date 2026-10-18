@@ -19,7 +19,7 @@ from .protocol import (
     MSG_HELLO, MSG_HELLO_ACK, MSG_MANIFEST, MSG_ACCEPT, MSG_REJECT,
     MSG_RESUME_QUERY, MSG_RESUME_BITMAP, MSG_BLOCK, MSG_BLOCK_ACK, MSG_BLOCK_NACK,
     MSG_FILE_DONE, MSG_SESSION_DONE, MSG_CANCEL, MSG_ERROR,
-    BLOCK_HEADER_FORMAT, tune_socket, send_packet, send_json, recv_packet, recv_json
+    BLOCK_HEADER_FORMAT, tune_socket, send_packet, send_json, recv_packet, recv_json, send_block
 )
 from .history_db import HistoryDatabase
 
@@ -218,15 +218,15 @@ class TransferEngine:
 
                 total_blocks = math.ceil(file_size / BLOCK_SIZE) if file_size > 0 else 0
 
-                # Query resume status
-                send_json(sock, MSG_RESUME_QUERY, session_id, {"file_id": file_id})
-                msg_type, _, resume_data = recv_json(sock)
                 verified_blocks = set()
-                if msg_type == MSG_RESUME_BITMAP and resume_data:
-                    verified_blocks = set(resume_data.get("verified_blocks", []))
+                if total_blocks > 0:
+                    send_json(sock, MSG_RESUME_QUERY, session_id, {"file_id": file_id})
+                    msg_type, _, resume_data = recv_json(sock)
+                    if msg_type == MSG_RESUME_BITMAP and resume_data:
+                        verified_blocks = set(resume_data.get("verified_blocks", []))
 
-                # Stream blocks
-                with open(abs_path, "rb") as f:
+                # Stream blocks continuously at wire speed
+                with open(abs_path, "rb", buffering=4 * 1024 * 1024) as f:
                     for block_idx in range(total_blocks):
                         if self._cancel_requested:
                             break
@@ -242,26 +242,17 @@ class TransferEngine:
                         data = f.read(block_len)
                         block_hash = hashlib.sha256(data).digest()
 
-                        # Pack block header
-                        block_header = struct.pack(BLOCK_HEADER_FORMAT, file_id, block_idx, len(data), block_hash)
-                        send_packet(sock, MSG_BLOCK, session_id, block_header + data)
-
-                        # Await ACK / NACK
-                        ack_type, _, ack_payload = recv_packet(sock)
-                        if ack_type == MSG_BLOCK_NACK:
-                            # Instant retry for failed block
-                            send_packet(sock, MSG_BLOCK, session_id, block_header + data)
-                            recv_packet(sock)  # Consume retry ACK
-
+                        # Send block continuously (zero-copy framing)
+                        send_block(sock, session_id, file_id, block_idx, data, block_hash)
                         self.transferred_bytes += len(data)
 
-                        # Rate limiting
+                        # Rate limiting (only if user explicitly capped bandwidth)
                         if self.rate_limit_mbps > 0:
                             target_bytes_sec = self.rate_limit_mbps * 1024 * 1024
                             chunk_duration = len(data) / target_bytes_sec
-                            time.sleep(chunk_duration * 0.9)
+                            time.sleep(chunk_duration)
 
-                        # Speed calculation
+                        # Live speed calculation
                         now = time.time()
                         dt = now - last_speed_time
                         if dt >= 0.5:
@@ -272,8 +263,25 @@ class TransferEngine:
                             last_speed_time = now
                             last_speed_bytes = self.transferred_bytes
 
-                # File done
-                send_json(sock, MSG_FILE_DONE, session_id, {"file_id": file_id})
+                # File done: send MSG_FILE_DONE and await receiver confirmation
+                if not self._cancel_requested:
+                    send_json(sock, MSG_FILE_DONE, session_id, {"file_id": file_id})
+                    msg_type, _, file_resp = recv_json(sock)
+
+                    # Handle selective retransmission if any block was missing
+                    while msg_type == MSG_FILE_DONE and file_resp and file_resp.get("status") == "retry":
+                        missing_blocks = file_resp.get("missing_blocks", [])
+                        if not missing_blocks or self._cancel_requested:
+                            break
+                        with open(abs_path, "rb", buffering=4 * 1024 * 1024) as f:
+                            for b_idx in missing_blocks:
+                                b_len = min(BLOCK_SIZE, file_size - (b_idx * BLOCK_SIZE))
+                                f.seek(b_idx * BLOCK_SIZE)
+                                d = f.read(b_len)
+                                b_hash = hashlib.sha256(d).digest()
+                                send_block(sock, session_id, file_id, b_idx, d, b_hash)
+                        send_json(sock, MSG_FILE_DONE, session_id, {"file_id": file_id})
+                        msg_type, _, file_resp = recv_json(sock)
 
             # 5. Session Complete
             if not self._cancel_requested:

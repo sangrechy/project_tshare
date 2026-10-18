@@ -52,11 +52,37 @@ def tune_socket(sock: socket.socket) -> None:
     try:
         # Disable Nagle's algorithm for immediate dispatch
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        # 2 MB socket buffers for 1 Gbps line-rate
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2 * 1024 * 1024)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 2 * 1024 * 1024)
     except Exception:
         pass
+    try:
+        # 4 MB socket buffers for 1 Gbps line-rate
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4 * 1024 * 1024)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4 * 1024 * 1024)
+    except Exception:
+        pass
+
+
+def send_block(
+    sock: socket.socket,
+    session_id: int,
+    file_id: int,
+    block_idx: int,
+    block_data: bytes,
+    block_hash: bytes
+) -> None:
+    """
+    Sends a high-speed streaming block with zero intermediate payload concatenation.
+    Combines 11-byte Packet Header and 44-byte Block Header into a single 55-byte header,
+    then writes block_data directly from memory to socket.
+    """
+    data_len = len(block_data)
+    hdr = struct.pack(
+        '!2sBIIIII32s',
+        MAGIC, MSG_BLOCK, session_id, BLOCK_HEADER_SIZE + data_len,
+        file_id, block_idx, data_len, block_hash
+    )
+    sock.sendall(hdr)
+    sock.sendall(block_data)
 
 
 def recv_exact(sock: socket.socket, num_bytes: int) -> bytes:

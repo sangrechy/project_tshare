@@ -16,11 +16,11 @@ import threading
 from typing import Dict, List, Any, Optional, Callable
 
 from .protocol import (
-    MAGIC, DEFAULT_TCP_PORT, BLOCK_SIZE, HEADER_SIZE, BLOCK_HEADER_SIZE,
+    MAGIC, DEFAULT_TCP_PORT, BLOCK_SIZE, HEADER_FORMAT, HEADER_SIZE, BLOCK_HEADER_FORMAT, BLOCK_HEADER_SIZE,
     MSG_HELLO, MSG_HELLO_ACK, MSG_MANIFEST, MSG_ACCEPT, MSG_REJECT,
     MSG_RESUME_QUERY, MSG_RESUME_BITMAP, MSG_BLOCK, MSG_BLOCK_ACK, MSG_BLOCK_NACK,
     MSG_FILE_DONE, MSG_SESSION_DONE, MSG_CANCEL, MSG_ERROR,
-    BLOCK_HEADER_FORMAT, tune_socket, send_packet, send_json, recv_packet, recv_json
+    tune_socket, send_packet, send_json, recv_packet, recv_json, recv_exact
 )
 from .path_security import sanitize_relative_path, resolve_safe_destination_path, SecurityViolation
 from .history_db import HistoryDatabase
@@ -284,98 +284,165 @@ class ReceiverEngine:
                     except Exception:
                         verified_blocks = set()
 
-                # Handle RESUME_QUERY if sender asks
-                # The sender will query or immediately stream blocks
-                file_handle = open(staging_path, "r+b" if os.path.exists(staging_path) else "wb")
-                if file_size > 0:
-                    file_handle.truncate(file_size)
+                file_handle = open(staging_path, "r+b" if os.path.exists(staging_path) else "wb", buffering=4 * 1024 * 1024)
+                if file_size > 0 and not os.path.exists(staging_path):
+                    try:
+                        file_handle.truncate(file_size)
+                    except Exception:
+                        pass
 
-                # Receive blocks for this file
+                corrupted_blocks = set()
+                msg_type = None
+
+                # Continuous streaming block receiver
                 while len(verified_blocks) < total_blocks and not self._cancel_requested:
-                    msg_type, _, payload = recv_packet(sock)
+                    header_bytes = recv_exact(sock, HEADER_SIZE)
+                    magic, msg_type, s_id, payload_len = struct.unpack(HEADER_FORMAT, header_bytes)
 
                     if msg_type == MSG_RESUME_QUERY:
-                        # Send back verified blocks bitmap
+                        if payload_len > 0:
+                            recv_exact(sock, payload_len)
                         send_json(sock, MSG_RESUME_BITMAP, session_id, {
                             "file_id": file_id,
                             "verified_blocks": list(verified_blocks)
                         })
                         continue
 
-                    if msg_type == MSG_CANCEL:
+                    if msg_type == MSG_BLOCK:
+                        # Read 44-byte block header
+                        b_hdr = recv_exact(sock, BLOCK_HEADER_SIZE)
+                        b_file_id, block_idx, block_len, expected_hash = struct.unpack(BLOCK_HEADER_FORMAT, b_hdr)
+
+                        # Stream directly from socket into file in 512KB chunks
+                        file_handle.seek(block_idx * BLOCK_SIZE)
+                        hasher = hashlib.sha256()
+                        remaining = block_len
+                        while remaining > 0:
+                            chunk = sock.recv(min(remaining, 512 * 1024))
+                            if not chunk:
+                                raise ConnectionError("Connection lost while reading block payload")
+                            hasher.update(chunk)
+                            file_handle.write(chunk)
+                            remaining -= len(chunk)
+
+                        if hasher.digest() == expected_hash:
+                            verified_blocks.add(block_idx)
+                            corrupted_blocks.discard(block_idx)
+                        else:
+                            corrupted_blocks.add(block_idx)
+
+                        self.transferred_bytes += block_len
+
+                        # Speed calculation
+                        now = time.time()
+                        dt = now - last_speed_time
+                        if dt >= 0.5:
+                            bytes_diff = self.transferred_bytes - last_speed_bytes
+                            self.speed_mbps = (bytes_diff / dt) / (1024 * 1024)
+                            rem_bytes = max(0, self.total_bytes - self.transferred_bytes)
+                            self.eta_seconds = (rem_bytes / (self.speed_mbps * 1024 * 1024)) if self.speed_mbps > 0 else 0
+                            last_speed_time = now
+                            last_speed_bytes = self.transferred_bytes
+
+                        # Save state journal periodically (every 20 blocks or on last block)
+                        if len(verified_blocks) % 20 == 0 or len(verified_blocks) == total_blocks:
+                            try:
+                                with open(state_path, "w", encoding="utf-8") as sf:
+                                    json.dump({
+                                        "file_id": file_id,
+                                        "file_size": file_size,
+                                        "verified_blocks": list(verified_blocks)
+                                    }, sf)
+                            except Exception:
+                                pass
+
+                    elif msg_type == MSG_FILE_DONE:
+                        if payload_len > 0:
+                            recv_exact(sock, payload_len)
+                        break
+
+                    elif msg_type == MSG_CANCEL:
                         self._cancel_requested = True
                         break
 
-                    if msg_type != MSG_BLOCK:
-                        continue
-
-                    # Unpack block header
-                    b_file_id, block_idx, block_len, expected_hash = struct.unpack(
-                        BLOCK_HEADER_FORMAT, payload[:BLOCK_HEADER_SIZE]
-                    )
-                    block_data = payload[BLOCK_HEADER_SIZE:]
-
-                    # In-flight cryptographic SHA-256 verification
-                    computed_hash = hashlib.sha256(block_data).digest()
-                    if computed_hash != expected_hash:
-                        # Corrupted chunk: NACK
-                        send_packet(sock, MSG_BLOCK_NACK, session_id, struct.pack("!II", b_file_id, block_idx))
-                        continue
-
-                    # Write block to disk at offset
-                    file_handle.seek(block_idx * BLOCK_SIZE)
-                    file_handle.write(block_data)
-
-                    verified_blocks.add(block_idx)
-                    self.transferred_bytes += len(block_data)
-
-                    # Periodically save state journal (every 10 blocks)
-                    if len(verified_blocks) % 10 == 0 or len(verified_blocks) == total_blocks:
-                        try:
-                            with open(state_path, "w", encoding="utf-8") as sf:
-                                json.dump({
-                                    "file_id": file_id,
-                                    "file_size": file_size,
-                                    "verified_blocks": list(verified_blocks)
-                                }, sf)
-                        except Exception:
-                            pass
-
-                    # Send ACK
-                    send_packet(sock, MSG_BLOCK_ACK, session_id, struct.pack("!II", b_file_id, block_idx))
-
-                    # Update speed calculation
-                    now = time.time()
-                    dt = now - last_speed_time
-                    if dt >= 0.5:
-                        bytes_diff = self.transferred_bytes - last_speed_bytes
-                        self.speed_mbps = (bytes_diff / dt) / (1024 * 1024)
-                        rem_bytes = max(0, self.total_bytes - self.transferred_bytes)
-                        self.eta_seconds = (rem_bytes / (self.speed_mbps * 1024 * 1024)) if self.speed_mbps > 0 else 0
-                        last_speed_time = now
-                        last_speed_bytes = self.transferred_bytes
-
-                # File complete
+                # Flush and close file handle
                 file_handle.flush()
-                os.fsync(file_handle.fileno())
                 file_handle.close()
 
-                if not self._cancel_requested and len(verified_blocks) == total_blocks:
-                    # Atomic replace to final target with cross-device fallback
-                    try:
-                        os.replace(staging_path, final_dest_path)
-                    except OSError:
-                        import shutil
-                        shutil.copy2(staging_path, final_dest_path)
+                # If file wasn't done yet, read the MSG_FILE_DONE packet
+                if not self._cancel_requested:
+                    missing = (set(range(total_blocks)) - verified_blocks) | corrupted_blocks
+                    if not missing:
+                        if msg_type != MSG_FILE_DONE:
+                            m_type, _, _ = recv_packet(sock)
+                            while m_type != MSG_FILE_DONE and not self._cancel_requested:
+                                m_type, _, _ = recv_packet(sock)
+
+                        send_json(sock, MSG_FILE_DONE, session_id, {"status": "ok"})
                         try:
-                            os.remove(staging_path)
-                        except Exception:
-                            pass
-                    if os.path.exists(state_path):
-                        try:
-                            os.remove(state_path)
-                        except Exception:
-                            pass
+                            os.replace(staging_path, final_dest_path)
+                        except OSError:
+                            import shutil
+                            shutil.copy2(staging_path, final_dest_path)
+                            try:
+                                os.remove(staging_path)
+                            except Exception:
+                                pass
+                        if os.path.exists(state_path):
+                            try:
+                                os.remove(state_path)
+                            except Exception:
+                                pass
+                    else:
+                        # Selective retransmission loop
+                        while missing and not self._cancel_requested:
+                            send_json(sock, MSG_FILE_DONE, session_id, {
+                                "status": "retry",
+                                "missing_blocks": list(missing)
+                            })
+                            file_handle = open(staging_path, "r+b", buffering=4 * 1024 * 1024)
+                            while missing and not self._cancel_requested:
+                                h_bytes = recv_exact(sock, HEADER_SIZE)
+                                _, m_t, _, p_l = struct.unpack(HEADER_FORMAT, h_bytes)
+                                if m_t == MSG_BLOCK:
+                                    b_hdr = recv_exact(sock, BLOCK_HEADER_SIZE)
+                                    _, b_idx, b_len, exp_h = struct.unpack(BLOCK_HEADER_FORMAT, b_hdr)
+                                    file_handle.seek(b_idx * BLOCK_SIZE)
+                                    hasher = hashlib.sha256()
+                                    rem = b_len
+                                    while rem > 0:
+                                        c = sock.recv(min(rem, 512 * 1024))
+                                        if not c:
+                                            raise ConnectionError("Connection lost")
+                                        hasher.update(c)
+                                        file_handle.write(c)
+                                        rem -= len(c)
+                                    if hasher.digest() == exp_h:
+                                        missing.discard(b_idx)
+                                        verified_blocks.add(b_idx)
+                                elif m_t == MSG_FILE_DONE:
+                                    if p_l > 0:
+                                        recv_exact(sock, p_l)
+                                    break
+                            file_handle.flush()
+                            file_handle.close()
+
+                        if not missing:
+                            send_json(sock, MSG_FILE_DONE, session_id, {"status": "ok"})
+                            try:
+                                os.replace(staging_path, final_dest_path)
+                            except OSError:
+                                import shutil
+                                shutil.copy2(staging_path, final_dest_path)
+                                try:
+                                    os.remove(staging_path)
+                                except Exception:
+                                    pass
+                            if os.path.exists(state_path):
+                                try:
+                                    os.remove(state_path)
+                                except Exception:
+                                    pass
 
             # Receive MSG_SESSION_DONE
             if not self._cancel_requested:
