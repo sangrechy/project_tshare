@@ -87,12 +87,16 @@ class BridgeAPI:
             ),
             "active_role": active_role,
             "transfer": active_data,
-            "can_resume": can_resume
+            "can_resume": can_resume,
+            "wire_alignment": self._discovery.get_subnet_alignment_status()
         }
 
     def get_discovered_peers(self) -> List[Dict[str, Any]]:
-        """Returns list of active peers found on direct link / LAN."""
+        """Returns list of active peers found on direct link / Wi-Fi assist."""
         return self._discovery.get_peers()
+
+    def get_wire_alignment_status(self) -> Optional[Dict[str, Any]]:
+        return self._discovery.get_subnet_alignment_status()
 
     def get_my_network_info(self) -> Dict[str, Any]:
         """Provides detailed Wi-Fi and Ethernet network module information."""

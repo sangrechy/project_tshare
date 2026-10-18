@@ -256,6 +256,23 @@ async function updateTelemetry() {
       }
     }
 
+    // Wi-Fi Assisted Subnet Alignment Alert
+    const alignNotice = document.getElementById('wireAlignNotice');
+    const alignText = document.getElementById('wireAlignText');
+    const alignBtn = document.getElementById('btnAlignWireIp');
+    if (alignNotice && data.wire_alignment && data.wire_alignment.mismatch) {
+      alignNotice.classList.remove('hidden');
+      if (alignText) {
+        alignText.innerHTML = `Receiver <strong>${data.wire_alignment.remote_name}</strong> is waiting on wire (<code>${data.wire_alignment.remote_wire_ip}</code>). Your adapter <code>${data.wire_alignment.local_eth_name}</code> is on <code>${data.wire_alignment.local_eth_ip}</code>.`;
+      }
+      if (alignBtn) {
+        alignBtn.textContent = `Align to ${data.wire_alignment.suggested_local_ip}`;
+        alignBtn.onclick = () => openAuthModal();
+      }
+    } else if (alignNotice) {
+      alignNotice.classList.add('hidden');
+    }
+
     // Refresh Send Tab Discovery list if on send tab
     if (activeTab === 'send') {
       refreshDiscoveredPeers();
@@ -423,26 +440,47 @@ async function refreshDiscoveredPeers() {
     peers.forEach(peer => {
       const div = document.createElement('div');
       div.className = 'peer-item';
-      if (peer.ip === selectedTargetIp) div.classList.add('selected');
+      const targetWireIp = peer.wire_ip || peer.ip;
+      if (targetWireIp === selectedTargetIp) div.classList.add('selected');
 
+      const isWireLocked = peer.wire_locked || peer.is_wifi_assisted;
       const isEth = peer.is_direct_ethernet;
-      const tagHtml = isEth
-        ? '<span class="badge-speed" style="margin-left:6px;">Ethernet Wire</span>'
-        : '<span class="badge-scan" style="margin-left:6px;">Wi-Fi LAN</span>';
+      let tagHtml = '';
+      let subDetail = '';
+
+      if (isWireLocked) {
+        tagHtml = '<span class="badge-speed" style="margin-left:6px; background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #10b981;">🔒 Wire-Locked (Wi-Fi Assist)</span>';
+        subDetail = `<div style="font-size: 11px; color: #10b981; margin-top: 2px;">⚡ Direct Cable (${targetWireIp}:${peer.port}) · 0% Wi-Fi transfer · Safe to turn off Wi-Fi!</div>`;
+      } else if (isEth) {
+        tagHtml = '<span class="badge-speed" style="margin-left:6px;">Ethernet Wire</span>';
+        subDetail = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Direct wire link (${peer.ip})</div>`;
+      } else {
+        tagHtml = '<span class="badge-scan" style="margin-left:6px;">Wi-Fi LAN</span>';
+        subDetail = `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Wi-Fi network (${peer.ip})</div>`;
+      }
 
       div.innerHTML = `
         <div>
           <div class="peer-name">${peer.name} ${tagHtml}</div>
-          <div class="peer-ip">${peer.ip}:${peer.port}</div>
+          <div class="peer-ip">${targetWireIp}:${peer.port}</div>
+          ${subDetail}
         </div>
-        <button class="btn-primary btn-sm">Select</button>
+        <button class="btn-primary btn-sm">${isWireLocked ? 'Lock Wire & Select' : 'Select'}</button>
       `;
 
       div.addEventListener('click', () => {
-        selectedTargetIp = peer.ip;
+        // ALWAYS lock to the direct Ethernet IP for file data transfer!
+        selectedTargetIp = targetWireIp;
         selectedTargetPort = peer.port;
-        document.getElementById('manualIpInput').value = peer.ip;
+        document.getElementById('manualIpInput').value = targetWireIp;
         document.getElementById('manualPortInput').value = peer.port;
+
+        const banner = document.getElementById('wireLockBanner');
+        if (banner) {
+          if (isWireLocked || isEth) banner.classList.remove('hidden');
+          else banner.classList.add('hidden');
+        }
+
         updateTargetReceiverStatus();
         refreshDiscoveredPeers();
       });
@@ -648,14 +686,16 @@ async function openAuthModal() {
     cachedPlatform = 'linux';
   }
 
+  if (pwdGroup) pwdGroup.classList.remove('hidden');
+
   if (cachedPlatform === 'win32') {
-    if (pwdGroup) pwdGroup.classList.add('hidden');
+    if (input) input.placeholder = 'Windows Password (or leave blank to use UAC)';
     if (desc) {
-      desc.innerHTML = 'Windows will request administrator permission (UAC) to temporarily assign direct Ethernet IP (<code>192.168.123.1</code>) and open firewall ports <code>52000–52010</code>.';
+      desc.innerHTML = 'Enter your Windows account password (or leave blank to use UAC) to temporarily assign direct Ethernet IP (<code>192.168.123.1</code>) and open firewall ports <code>52000–52010</code>.';
     }
-    if (btnConfirmText) btnConfirmText.textContent = 'Launch Windows UAC';
+    if (btnConfirmText) btnConfirmText.textContent = 'Authorize & Configure';
   } else {
-    if (pwdGroup) pwdGroup.classList.remove('hidden');
+    if (input) input.placeholder = 'Enter password...';
     if (desc) {
       desc.innerHTML = 'Enter your system password to temporarily assign direct Ethernet IP (<code>192.168.123.2</code>) and open firewall ports <code>52000–52010</code>.';
     }
@@ -663,7 +703,7 @@ async function openAuthModal() {
   }
 
   modal.classList.remove('hidden');
-  if (cachedPlatform !== 'win32' && input) {
+  if (input) {
     setTimeout(() => input.focus(), 100);
   }
 }

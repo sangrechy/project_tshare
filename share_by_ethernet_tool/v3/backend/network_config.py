@@ -59,7 +59,7 @@ def configure_direct_ethernet(password: str = "") -> Dict[str, Any]:
     if sys.platform.startswith("linux"):
         return _configure_linux(password, parent_pid, backup_path)
     elif sys.platform == "win32":
-        return _configure_windows(parent_pid, backup_path)
+        return _configure_windows(password, parent_pid, backup_path)
     elif sys.platform == "darwin":
         return _configure_macos(password, parent_pid, backup_path)
     else:
@@ -193,7 +193,31 @@ nohup bash -c '
     return {"success": False, "error": "Password required", "need_password": True}
 
 
-def _configure_windows(parent_pid: int, backup_path: str) -> Dict[str, Any]:
+def _configure_windows(password: str, parent_pid: int, backup_path: str) -> Dict[str, Any]:
+    # 1. If user entered a password in the in-UI modal, validate it via Windows Logon API
+    if password:
+        try:
+            import ctypes
+            from ctypes import wintypes
+            advapi32 = ctypes.windll.advapi32
+            token = wintypes.HANDLE()
+            username = os.environ.get("USERNAME", "")
+            domain = os.environ.get("USERDOMAIN", ".")
+
+            # Authenticate against local or domain authority
+            auth_ok = advapi32.LogonUserW(username, ".", password, 2, 0, ctypes.byref(token))
+            if not auth_ok:
+                auth_ok = advapi32.LogonUserW(username, domain, password, 2, 0, ctypes.byref(token))
+
+            if not auth_ok:
+                err = ctypes.GetLastError()
+                if err == 1326:
+                    return {"success": False, "error": "Incorrect Windows password. Please enter your valid Windows password."}
+            if token.value:
+                ctypes.windll.kernel32.CloseHandle(token)
+        except Exception:
+            pass
+
     trigger_path = TRIGGER_FILE
     bpath_esc = backup_path.replace("\\", "\\\\")
     tpath_esc = trigger_path.replace("\\", "\\\\")
@@ -225,6 +249,7 @@ New-NetFirewallRule -DisplayName "T-Share-Direct-Temp-UDP" -Direction Inbound -L
 $hasSubnet = (Get-NetIPAddress -InterfaceIndex $idx -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {{ $_.IPAddress -like "192.168.123.*" }})
 if (-not $hasSubnet) {{
   New-NetIPAddress -InterfaceIndex $idx -IPAddress 192.168.123.1 -PrefixLength 24 -ErrorAction SilentlyContinue
+  netsh interface ipv4 add address $idx 192.168.123.1 255.255.255.0 2>$null
 }}
 
 # 3. Launch background watchdog script
@@ -243,6 +268,7 @@ while (Get-Process -Id `$ppid -ErrorAction SilentlyContinue) {{
 Remove-NetFirewallRule -DisplayName 'T-Share-Direct-Temp-TCP' -ErrorAction SilentlyContinue
 Remove-NetFirewallRule -DisplayName 'T-Share-Direct-Temp-UDP' -ErrorAction SilentlyContinue
 Remove-NetIPAddress -InterfaceIndex `$idx -IPAddress 192.168.123.1 -Confirm:`$false -ErrorAction SilentlyContinue
+netsh interface ipv4 delete address `$idx 192.168.123.1 2>`$null
 
 if (`$hadDhcp -eq 'True') {{
   Set-NetIPInterface -InterfaceIndex `$idx -Dhcp Enabled -ErrorAction SilentlyContinue
@@ -255,15 +281,29 @@ $watchdogScript | Set-Content -Path "{watchdog_file}" -Force
 Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"{watchdog_file}`""
 '''
 
-    # Write setup script to temporary file and execute via -File to avoid PowerShell string format errors
+    # Write setup script to temporary file and execute via native ShellExecuteW (runas verb)
     setup_file = os.path.join(tempfile.gettempdir(), "tshare_win_setup.ps1")
     try:
         with open(setup_file, "w", encoding="utf-8") as f:
             f.write(ps_script)
 
-        cmd = f'Start-Process powershell -Verb runAs -ArgumentList \'-NoProfile -ExecutionPolicy Bypass -File "{setup_file}"\''
-        subprocess.Popen(["powershell", "-NoProfile", "-Command", cmd])
-        return {"success": True, "message": "Windows UAC confirmation triggered."}
+        import ctypes
+        res = ctypes.windll.shell32.ShellExecuteW(
+            None,
+            "runas",
+            "powershell.exe",
+            f'-NoProfile -ExecutionPolicy Bypass -File "{setup_file}"',
+            None,
+            1
+        )
+        if res > 32:
+            return {"success": True, "message": "Windows administrator authorization confirmed (192.168.123.1)."}
+        elif res == 5:
+            return {"success": False, "error": "Administrator authorization was cancelled or denied."}
+        else:
+            # Fallback to subprocess if ShellExecuteW returned other code
+            subprocess.Popen(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup_file])
+            return {"success": True, "message": "Windows network configuration script started."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

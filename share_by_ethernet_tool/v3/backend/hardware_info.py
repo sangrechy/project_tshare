@@ -6,8 +6,9 @@ Collects hardware metrics to drive live gauges and resource governor sliders.
 import os
 import socket
 import shutil
+import ipaddress
 import psutil
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 
 def get_network_interfaces() -> List[Dict[str, Any]]:
@@ -98,6 +99,78 @@ def get_detailed_network_info() -> Dict[str, Any]:
         "wifi": wifi_entry,
         "ethernet": eth_entry
     }
+
+
+def get_detailed_adapters() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
+    """
+    Returns (eth_list, wifi_list, broadcast_addrs)
+    - eth_list: physical Ethernet adapters with IP, MAC, IPv6 link-local, status, speed.
+    - wifi_list: Wi-Fi adapters with IP, MAC, IPv6 link-local, status, speed.
+    - broadcast_addrs: all subnet broadcast addresses (e.g. 10.96.64.255, 192.168.123.255).
+    """
+    eth_list = []
+    wifi_list = []
+    bcasts = set(["255.255.255.255", "192.168.123.255", "169.254.255.255", "192.168.123.1", "192.168.123.2"])
+
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+
+        for name, addr_list in addrs.items():
+            lname = name.lower()
+            stat = stats.get(name)
+            is_up = stat.isup if stat else True
+            speed = stat.speed if stat and stat.speed > 0 else 1000
+
+            is_wifi = any(w in lname for w in ["wl", "wi-fi", "wifi", "wireless", "802.11"])
+            is_eth = any(e in lname for e in ["eth", "en", "ethernet", "lan", "realtek", "intel", "asix"]) and not is_wifi
+
+            ipv4 = ""
+            ipv6_ll = ""
+            mac = ""
+
+            for a in addr_list:
+                if a.family == socket.AF_INET and not a.address.startswith("127."):
+                    if a.address.startswith("192.168.123."):
+                        ipv4 = a.address
+                    elif not ipv4:
+                        ipv4 = a.address
+
+                    if a.netmask:
+                        try:
+                            net = ipaddress.IPv4Network(f"{a.address}/{a.netmask}", strict=False)
+                            bcasts.add(str(net.broadcast_address))
+                        except Exception:
+                            pass
+                elif a.family == socket.AF_INET6:
+                    if a.address.startswith("fe80:"):
+                        ipv6_ll = a.address.split("%")[0]
+                elif a.family == getattr(psutil, "AF_LINK", -1):
+                    mac = a.address
+
+            info = {
+                "name": name,
+                "ip": ipv4,
+                "mac": mac,
+                "ipv6_ll": ipv6_ll,
+                "is_up": is_up,
+                "speed_mbps": speed
+            }
+
+            if is_eth:
+                eth_list.append(info)
+            elif is_wifi:
+                wifi_list.append(info)
+    except Exception:
+        pass
+
+    eth_list.sort(key=lambda x: (
+        0 if x["ip"].startswith("192.168.123.") else (
+        1 if x["ip"].startswith("169.254.") else (
+        2 if bool(x["ip"]) else 3
+    ))))
+
+    return eth_list, wifi_list, list(bcasts)
 
 
 def get_primary_ip() -> str:

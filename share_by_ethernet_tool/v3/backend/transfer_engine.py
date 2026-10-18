@@ -165,9 +165,24 @@ class TransferEngine:
         self.receiver_status_message = "Connecting to peer..."
 
         try:
-            # 1. Connect TCP socket
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(10.0)
+            # 1. Connect TCP socket (Strict Wire Binding when target is on direct cable)
+            is_ipv6 = ":" in self.target_ip
+            sock = socket.socket(socket.AF_INET6 if is_ipv6 else socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(12.0)
+
+            if not is_ipv6 and self.target_ip.startswith("192.168.123."):
+                from .hardware_info import get_detailed_adapters
+                eths, _, _ = get_detailed_adapters()
+                for eth in eths:
+                    eip = eth.get("ip", "")
+                    if eip and eip.startswith("192.168.123."):
+                        try:
+                            # Bind directly to physical Ethernet interface IP to decouple from Wi-Fi
+                            sock.bind((eip, 0))
+                            break
+                        except Exception:
+                            pass
+
             sock.connect((self.target_ip, self.target_port))
             tune_socket(sock)
             self._sock = sock

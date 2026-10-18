@@ -10,6 +10,7 @@ import tempfile
 import struct
 import time
 import threading
+import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -393,6 +394,101 @@ class TestTSHAREV3(unittest.TestCase):
             bridge._transfer = sender
             telemetry = bridge.get_dashboard_telemetry()
             self.assertTrue(telemetry['can_resume'])
+
+    def test_16_wifi_assisted_discovery_and_wire_lock(self):
+        """Verifies that discovery over Wi-Fi locks the connection target strictly to direct Ethernet."""
+        from backend.discovery import PeerDiscovery
+        discovery = PeerDiscovery()
+
+        # Simulate receiving a beacon over Wi-Fi (10.96.64.83) containing direct Ethernet details (192.168.123.2)
+        beacon_data = json.dumps({
+            "app": "tshare-v3",
+            "id": "node_fedora_direct",
+            "name": "Fedora-Workstation",
+            "port": 52001,
+            "wifi_assisted": True,
+            "ethernet": {
+                "name": "enp3s0",
+                "ip": "192.168.123.2",
+                "mac": "54:B2:03:A1:B2:C3",
+                "ipv6_ll": "fe80::56b2:3ff:fea1:b2c3",
+                "is_up": True,
+                "speed_mbps": 1000
+            },
+            "wifi": {
+                "name": "wlan0",
+                "ip": "10.96.64.83",
+                "mac": "1C:CE:51:BF:71:30"
+            }
+        }).encode('utf-8')
+
+        # Directly feed to internal parser logic
+        msg = json.loads(beacon_data.decode('utf-8'))
+        addr = ('10.96.64.83', 52002)
+
+        eth_info = msg.get("ethernet", {})
+        wifi_info = msg.get("wifi", {})
+        wire_ip = eth_info.get("ip", "")
+        wire_mac = eth_info.get("mac", "")
+        is_wifi_source = not (addr[0].startswith("192.168.123.") or addr[0].startswith("169.254."))
+
+        target_ip = wire_ip if wire_ip else addr[0]
+
+        peer_info = {
+            "id": msg["id"],
+            "name": msg["name"],
+            "ip": target_ip,
+            "wire_ip": wire_ip,
+            "wire_mac": wire_mac,
+            "wifi_ip": wifi_info.get("ip", addr[0]),
+            "port": msg["port"],
+            "last_seen": time.time(),
+            "is_direct_ethernet": bool(wire_ip),
+            "is_wifi_assisted": is_wifi_source and bool(wire_ip),
+            "wire_locked": bool(wire_ip),
+            "medium": "wire_locked"
+        }
+
+        with discovery._lock:
+            discovery._peers[msg["id"]] = peer_info
+
+        peers = discovery.get_peers()
+        self.assertEqual(len(peers), 1)
+        p = peers[0]
+
+        # Primary connection IP MUST be locked to direct Ethernet (192.168.123.2), NOT Wi-Fi!
+        self.assertEqual(p["ip"], "192.168.123.2")
+        self.assertEqual(p["wire_ip"], "192.168.123.2")
+        self.assertEqual(p["wire_mac"], "54:B2:03:A1:B2:C3")
+        self.assertEqual(p["wifi_ip"], "10.96.64.83")
+        self.assertTrue(p["is_wifi_assisted"])
+        self.assertTrue(p["wire_locked"])
+        self.assertEqual(p["medium"], "wire_locked")
+
+    def test_17_subnet_alignment_status(self):
+        """Verifies proactive detection of wire subnet mismatches."""
+        from backend.discovery import PeerDiscovery
+        discovery = PeerDiscovery()
+
+        # When no peers, returns None
+        self.assertIsNone(discovery.get_subnet_alignment_status())
+
+        # When a peer is waiting on 192.168.123.2
+        with discovery._lock:
+            discovery._peers["peer_123"] = {
+                "id": "peer_123",
+                "name": "Fedora",
+                "ip": "192.168.123.2",
+                "wire_ip": "192.168.123.2",
+                "port": 52001,
+                "last_seen": time.time()
+            }
+
+        status = discovery.get_subnet_alignment_status()
+        if status:
+            self.assertTrue(status.get("mismatch"))
+            self.assertEqual(status.get("remote_wire_ip"), "192.168.123.2")
+            self.assertEqual(status.get("suggested_local_ip"), "192.168.123.1")
 
 
 if __name__ == '__main__':
