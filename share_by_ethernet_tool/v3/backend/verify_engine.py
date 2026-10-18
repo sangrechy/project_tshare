@@ -98,6 +98,9 @@ class VerifyEngine:
         else:
             for root, _, fnames in os.walk(target_path):
                 for f in fnames:
+                    # Ignore system/hidden/state files
+                    if f.startswith('.') or f.endswith(('.db', '.part', '.tmp', '.state')):
+                        continue
                     fp = os.path.join(root, f)
                     scanned_files.append((fp, os.path.getsize(fp)))
 

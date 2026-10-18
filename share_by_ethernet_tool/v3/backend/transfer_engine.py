@@ -278,6 +278,11 @@ class TransferEngine:
             # 5. Session Complete
             if not self._cancel_requested:
                 send_json(sock, MSG_SESSION_DONE, session_id, {})
+                try:
+                    # Await final ACK from receiver to ensure clean symmetric close
+                    recv_packet(sock)
+                except Exception:
+                    pass
                 duration = max(0.1, time.time() - start_time)
                 avg_speed = (self.transferred_bytes / duration) / (1024 * 1024)
 

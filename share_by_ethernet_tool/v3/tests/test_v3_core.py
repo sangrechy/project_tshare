@@ -1,0 +1,140 @@
+"""
+T-Share v3 Automated Test Suite
+Verifies cross-platform protocol, path security, database lifecycle, and streaming integrity.
+"""
+
+import unittest
+import sys
+import os
+import tempfile
+import struct
+import time
+import threading
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from backend.path_security import sanitize_relative_path, resolve_safe_destination_path, SecurityViolation
+from backend.protocol import (
+    MAGIC, HEADER_FORMAT, BLOCK_HEADER_FORMAT, HEADER_SIZE, BLOCK_HEADER_SIZE,
+    MSG_BLOCK, send_packet, recv_packet
+)
+from backend.hardware_info import get_hardware_telemetry, get_network_interfaces, get_disk_space
+from backend.history_db import HistoryDatabase
+from backend.receiver_engine import ReceiverEngine
+from backend.transfer_engine import TransferEngine
+from backend.verify_engine import VerifyEngine
+
+
+class TestTSHAREV3(unittest.TestCase):
+    def test_01_path_security_traversal(self):
+        with self.assertRaises(SecurityViolation):
+            sanitize_relative_path('../../etc/passwd')
+        with self.assertRaises(SecurityViolation):
+            sanitize_relative_path('folder/../../../root.key')
+        with self.assertRaises(SecurityViolation):
+            sanitize_relative_path('')
+
+    def test_02_path_security_windows_reserved(self):
+        self.assertEqual(sanitize_relative_path('con.txt'), '_safe_con.txt')
+        self.assertEqual(sanitize_relative_path('AUX'), '_safe_AUX')
+        self.assertEqual(sanitize_relative_path('sub/prn.log'), 'sub/_safe_prn.log')
+        self.assertEqual(sanitize_relative_path('C:\\Users\\test\\docs/file.pdf'), 'Users/test/docs/file.pdf')
+
+    def test_03_path_containment_and_collisions(self):
+        with tempfile.TemporaryDirectory() as td:
+            p1, skip = resolve_safe_destination_path(td, 'test.txt', 'keep_both')
+            self.assertFalse(skip)
+            with open(p1, 'w') as f:
+                f.write('orig')
+
+            p2, skip2 = resolve_safe_destination_path(td, 'test.txt', 'keep_both')
+            self.assertFalse(skip2)
+            self.assertTrue(p2.endswith('test (1).txt'))
+
+            p3, skip3 = resolve_safe_destination_path(td, 'test.txt', 'skip')
+            self.assertTrue(skip3)
+
+    def test_04_protocol_framing(self):
+        header = struct.pack(HEADER_FORMAT, MAGIC, MSG_BLOCK, 12345, 100)
+        magic, mtype, sid, plen = struct.unpack(HEADER_FORMAT, header)
+        self.assertEqual(magic, MAGIC)
+        self.assertEqual(mtype, MSG_BLOCK)
+        self.assertEqual(sid, 12345)
+        self.assertEqual(plen, 100)
+
+    def test_05_hardware_telemetry(self):
+        telemetry = get_hardware_telemetry()
+        self.assertIn('cpu', telemetry)
+        self.assertIn('ram', telemetry)
+        self.assertIn('disk', telemetry)
+        self.assertIn('network', telemetry)
+        self.assertGreater(telemetry['cpu']['cores'], 0)
+        self.assertGreater(telemetry['ram']['total_bytes'], 0)
+
+    def test_06_history_database(self):
+        with tempfile.TemporaryDirectory() as td:
+            db_path = os.path.join(td, 'test.db')
+            db = HistoryDatabase(db_path)
+            row_id = db.record_transfer('9999', 'sender', 'laptop2', '169.254.1.2', 'completed', 5, 100000, 100000, 95.5, 1.2, td)
+            self.assertGreater(row_id, 0)
+            transfers = db.get_transfers()
+            self.assertEqual(len(transfers), 1)
+            self.assertEqual(transfers[0]['session_id'], '9999')
+
+    def test_07_verification_modes(self):
+        with tempfile.TemporaryDirectory() as td:
+            db_path = os.path.join(td, 'test.db')
+            db = HistoryDatabase(db_path)
+            data_dir = os.path.join(td, 'files')
+            os.makedirs(data_dir)
+            fpath = os.path.join(data_dir, 'data.bin')
+            with open(fpath, 'wb') as f:
+                f.write(os.urandom(1024 * 1024))
+            db.record_transfer('sess1', 'receiver', 'peer', '127.0.0.1', 'completed', 1, 1024*1024, 1024*1024, 100.0, 0.1, data_dir)
+
+            v = VerifyEngine(db)
+            v.start_verification('sess1', 'quick_parity')
+            v._thread.join()
+            self.assertEqual(v.status, 'passed')
+
+            v.start_verification('sess1', 'full_crypto')
+            v._thread.join()
+            self.assertEqual(v.status, 'passed')
+
+    def test_08_end_to_end_streaming(self):
+        with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
+            test_file = os.path.join(src, 'large.bin')
+            raw_bytes = os.urandom(6 * 1024 * 1024)
+            with open(test_file, 'wb') as f:
+                f.write(raw_bytes)
+
+            recv = ReceiverEngine(port=52035)
+            recv.start()
+
+            def auto_accept():
+                while recv.status != 'waiting_user':
+                    time.sleep(0.02)
+                recv.accept_transfer(dst, 'overwrite')
+            threading.Thread(target=auto_accept, daemon=True).start()
+
+            sender = TransferEngine()
+            sender.start_transfer('127.0.0.1', 52035, [test_file])
+            sender._thread.join(timeout=15)
+
+            timeout = 5
+            st = time.time()
+            while recv.status != 'completed' and time.time() - st < timeout:
+                time.sleep(0.05)
+
+            self.assertEqual(sender.status, 'completed')
+            self.assertEqual(recv.status, 'completed')
+            recv.stop()
+
+            out = os.path.join(dst, 'large.bin')
+            self.assertTrue(os.path.exists(out))
+            with open(out, 'rb') as f:
+                self.assertEqual(f.read(), raw_bytes)
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -361,8 +361,16 @@ class ReceiverEngine:
                 file_handle.close()
 
                 if not self._cancel_requested and len(verified_blocks) == total_blocks:
-                    # Atomic replace to final target
-                    os.replace(staging_path, final_dest_path)
+                    # Atomic replace to final target with cross-device fallback
+                    try:
+                        os.replace(staging_path, final_dest_path)
+                    except OSError:
+                        import shutil
+                        shutil.copy2(staging_path, final_dest_path)
+                        try:
+                            os.remove(staging_path)
+                        except Exception:
+                            pass
                     if os.path.exists(state_path):
                         try:
                             os.remove(state_path)
@@ -372,6 +380,10 @@ class ReceiverEngine:
             # Receive MSG_SESSION_DONE
             if not self._cancel_requested:
                 msg_type, _, _ = recv_packet(sock)
+                try:
+                    send_packet(sock, MSG_SESSION_DONE, session_id, b'ACK')
+                except Exception:
+                    pass
                 duration = max(0.1, time.time() - start_time)
                 avg_speed = (self.transferred_bytes / duration) / (1024 * 1024)
 
