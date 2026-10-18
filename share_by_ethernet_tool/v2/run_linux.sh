@@ -31,13 +31,21 @@ if [ -z "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-# 2. Check for rsync
+# 2. Check for rsync and optional Samba
 if ! command -v rsync >/dev/null 2>&1; then
     echo "[!] Warning: 'rsync' is not installed on this system."
     echo "    High-speed transfers require rsync. Please install it:"
     echo "    Debian/Ubuntu: sudo apt install rsync"
     echo "    Fedora:        sudo dnf install rsync"
     echo "    Arch Linux:    sudo pacman -S rsync"
+    echo ""
+fi
+
+if ! command -v net >/dev/null 2>&1; then
+    echo "[i] Note: Samba client tools ('net') are not installed."
+    echo "    T-Share v2 features a Direct P2P Socket Engine that transfers"
+    echo "    between laptops over Ethernet without needing Samba or passwords!"
+    echo "    If you also want legacy Windows SMB sharing on Linux, install: sudo apt install samba smbclient"
     echo ""
 fi
 

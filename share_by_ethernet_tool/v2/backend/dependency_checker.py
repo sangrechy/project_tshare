@@ -93,6 +93,16 @@ def check_all_dependencies() -> dict[str, Any]:
                 "or 'brew install rsync' (macOS)."
             )
 
+        if sys.platform.startswith("linux"):
+            net_path = check_system_binary("net")
+            status["system_tools"]["samba_net"] = net_path is not None
+            if not net_path:
+                status["warnings"].append(
+                    "Samba client tools ('net') are not installed for legacy SMB. "
+                    "T-Share includes an autonomous Direct P2P Socket Engine that transfers without Samba! "
+                    "If you still wish to enable legacy Windows SMB shares on Linux, install: 'sudo apt install samba smbclient'."
+                )
+
     return status
 
 

@@ -90,6 +90,20 @@
         <div>
           <button class="btn-nm btn-primary" onclick="switchTab('send')">Open Transfer Deck ➔</button>
         </div>
+      <!-- Autonomous Direct Ethernet Auto-Discovery Radar -->
+      <div class="nm-card p2p-radar-card" id="p2pRadarCard">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.8rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="p2p-radar-pulse" id="p2pRadarPulse"></span>
+            <div>
+              <div style="font-size: 0.95rem; font-weight: 700;">⚡ Direct Ethernet Auto-Discovery (Plug & Play)</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);" id="p2pRadarStatus">Broadcasting beacon across Ethernet cable & LAN on port 49555...</div>
+            </div>
+          </div>
+          <div id="p2pPeersContainer" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <span style="font-size: 0.78rem; color: var(--text-muted);" id="p2pPeersEmpty">Waiting for connected peer laptop…</span>
+          </div>
+        </div>
       </div>
 
       <!-- System Overview Top Grid -->
@@ -186,6 +200,37 @@
          ======================================================== -->
     <main class="tab-view" id="viewSend">
       
+      <!-- Autonomous Direct Socket Streaming Panel (Recommended) -->
+      <div class="nm-card p2p-radar-card" style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="color: var(--dest-light); font-size: 1.15rem;">⚡</span>
+            <div>
+              <span style="font-weight: 700; font-size: 0.95rem;">Autonomous Direct Socket Stream (Recommended)</span>
+              <div style="font-size: 0.73rem; color: var(--text-secondary);">Direct TCP Socket • Chunk CRC32 Checksums • Safe Resume • Auto-Verification • Zero Passwords/Samba</div>
+            </div>
+          </div>
+          <span class="badge-verified" style="font-size: 0.72rem;">100% Bit-Safe</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: flex-end;">
+          <div>
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Discovered Peer Target (Over Direct Ethernet / LAN):</span>
+            <select id="p2pPeerSelect" class="select-nm" style="width: 100%; margin-top: 4px;">
+              <option value="">Scanning for Ethernet peer laptop…</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn-nm btn-primary" id="btnP2PStart" onclick="startP2PTransfer()">
+              ⚡ Send to Discovered Peer
+            </button>
+            <button class="btn-nm btn-danger" id="btnP2PStop" onclick="stopP2PTransfer()" style="display: none;">
+              ■ Stop Direct Transfer
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Path Controls & Tuning Bar -->
       <div class="nm-card send-path-panel">
         <div class="send-path-grid">
@@ -494,6 +539,40 @@
          ======================================================== -->
     <main class="tab-view" id="viewReceive">
       
+      <!-- Autonomous High-Speed Socket Receiver Card -->
+      <div class="nm-card p2p-radar-card" style="margin-bottom: 1.25rem; border-left: 3px solid var(--success);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <div style="font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem;">
+              <span class="status-dot online"></span>
+              Autonomous Socket Receiver (Active & Listening)
+            </div>
+            <p class="section-desc" style="margin: 3px 0 0 0;">
+              Listening on Port 52100. Any connected laptop can stream directly to this computer with zero passwords and zero Samba setup.
+            </p>
+          </div>
+          <span class="badge-verified" style="font-size: 0.72rem;">Socket Daemon Active</span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-top: 0.5rem; flex-wrap: wrap; gap: 0.6rem;">
+          <div>
+            <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Incoming Save Directory:</span>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--dest-light); margin-top: 2px;" id="p2pDestDirText">Loading…</div>
+          </div>
+          <button class="btn-nm btn-sm" onclick="changeP2PDestFolder()">📁 Change Folder</button>
+        </div>
+
+        <div id="p2pReceiveProgressBox" style="margin-top: 0.85rem; display: none;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+            <span id="p2pReceiveFileText">Receiving: —</span>
+            <span id="p2pReceiveSpeedText" style="color: var(--dest-light); font-weight: 700;">0 MB/s</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill fill-dest" id="p2pReceiveProgressFill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="nm-card receive-network-card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <div>

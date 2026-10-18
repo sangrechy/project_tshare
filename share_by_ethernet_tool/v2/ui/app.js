@@ -13,6 +13,8 @@ const state = {
   isTransferRunning: false,
   isVerifyRunning: false,
   isReceiverMonitoring: false,
+  isP2PRunning: false,
+  discoveredPeers: [],
   verifyRigor: 'metadata',
   verifyWorkers: 4,
   auditFilter: 'ALL',
@@ -200,6 +202,18 @@ async function refreshSystemOverview(force = false) {
       document.getElementById('homeStatFilesAudited').innerText = (data.stats.total_verified_files || 0).toLocaleString();
     }
 
+    // 5. Autonomous P2P Discovered Peers
+    if (data.peers) {
+      state.discoveredPeers = data.peers;
+      renderDiscoveredPeers(data.peers);
+    }
+
+    // 6. P2P Receiver Destination Directory
+    if (data.p2p_receiver && data.p2p_receiver.dest_dir) {
+      const p2pDirEl = document.getElementById('p2pDestDirText');
+      if (p2pDirEl) p2pDirEl.innerText = data.p2p_receiver.dest_dir;
+    }
+
   } catch (err) {
     console.error('refreshSystemOverview error:', err);
   } finally {
@@ -216,8 +230,25 @@ async function runTelemetryCycle() {
 
   try {
     if (window.pywebview && window.pywebview.api) {
-      // 1. Transfer Telemetry (fast in-memory read)
-      if (state.isTransferRunning || state.activeTab === 'send') {
+      // 1. P2P Direct Socket Sender Telemetry
+      if (state.isP2PRunning || state.activeTab === 'send') {
+        const pData = await window.pywebview.api.get_p2p_sender_telemetry();
+        if (pData) {
+          applyP2PSenderTelemetry(pData);
+        }
+        if (state.isP2PRunning) {
+          nextDelay = 350;
+        }
+      }
+
+      // 1b. P2P Direct Socket Receiver Telemetry
+      const p2pRecv = await window.pywebview.api.get_p2p_receiver_telemetry();
+      if (p2pRecv) {
+        applyP2PReceiverTelemetry(p2pRecv);
+      }
+
+      // 2. Robocopy / rsync Transfer Telemetry (fast in-memory read)
+      if (state.isTransferRunning || (state.activeTab === 'send' && !state.isP2PRunning)) {
         const tData = await window.pywebview.api.get_transfer_telemetry();
         if (tData) {
           applyTransferTelemetry(tData);
@@ -227,7 +258,7 @@ async function runTelemetryCycle() {
         }
       }
 
-      // 2. Verifier Telemetry
+      // 3. Verifier Telemetry
       if (state.isVerifyRunning || state.activeTab === 'verify') {
         const vData = await window.pywebview.api.get_verifier_status();
         if (vData) {
@@ -238,7 +269,7 @@ async function runTelemetryCycle() {
         }
       }
 
-      // 3. Receiver Telemetry
+      // 4. Legacy Receiver Telemetry
       if (state.isReceiverMonitoring || state.activeTab === 'receive') {
         const rData = await window.pywebview.api.get_receiver_status();
         if (rData) {
@@ -972,6 +1003,185 @@ window.onVerificationFinished = function(data) {
 // ==========================================================================
 // UTILITIES
 // ==========================================================================
+
+// ==========================================================================
+// AUTONOMOUS PEER-TO-PEER DIRECT SOCKET TRANSFER & AUTO-DISCOVERY
+// ==========================================================================
+
+function renderDiscoveredPeers(peers) {
+  const container = document.getElementById('p2pPeersContainer');
+  const emptyEl = document.getElementById('p2pPeersEmpty');
+  const selectEl = document.getElementById('p2pPeerSelect');
+
+  if (!container || !selectEl) return;
+
+  if (!peers || peers.length === 0) {
+    if (emptyEl) emptyEl.style.display = 'inline';
+    container.innerHTML = '<span style="font-size: 0.78rem; color: var(--text-muted);" id="p2pPeersEmpty">Waiting for connected peer laptop…</span>';
+    selectEl.innerHTML = '<option value="">Scanning for Ethernet peer laptop…</option>';
+    return;
+  }
+
+  // Render clickable peer badges in Home
+  container.innerHTML = peers.map(p => {
+    const isDirect = p.is_direct_ethernet ? '⚡ Direct Ethernet' : 'LAN';
+    return `
+      <button class="peer-badge-btn" onclick="selectDiscoveredPeer('${p.ip}', '${escapeJs(p.hostname)}', ${p.port})" title="Click to send files to this laptop">
+        <span class="status-dot dot-sm online"></span>
+        <strong>${escapeHtml(p.hostname)}</strong> (${p.ip})
+        <span style="font-size: 0.68rem; opacity: 0.8;">[${isDirect}]</span>
+      </button>
+    `;
+  }).join('');
+
+  // Populate Send tab dropdown
+  const curVal = selectEl.value;
+  selectEl.innerHTML = peers.map(p => {
+    const tag = p.is_direct_ethernet ? 'Direct Ethernet' : 'LAN';
+    const val = `${p.ip}:${p.port}`;
+    return `<option value="${val}" ${curVal === val ? 'selected' : ''}>${escapeHtml(p.hostname)} (${p.ip}) [${tag}]</option>`;
+  }).join('');
+}
+
+function selectDiscoveredPeer(ip, hostname, port) {
+  switchTab('send');
+  const sel = document.getElementById('p2pPeerSelect');
+  if (sel) sel.value = `${ip}:${port}`;
+  const src = document.getElementById('sendSourceInput');
+  if (src && !src.value) {
+    src.focus();
+    showToast(`Target set to ${hostname}. Choose a source folder to transfer.`, 'info');
+  } else {
+    showToast(`Target set to ${hostname} (${ip}). Ready to send!`, 'success');
+  }
+}
+
+async function startP2PTransfer() {
+  const source = document.getElementById('sendSourceInput').value.trim();
+  const peerSelect = document.getElementById('p2pPeerSelect');
+  const peerTarget = peerSelect ? peerSelect.value.trim() : '';
+
+  if (!source) {
+    showToast('Please select a Source file or directory first.', 'warning');
+    document.getElementById('sendSourceInput').focus();
+    return;
+  }
+
+  if (!peerTarget) {
+    showToast('No peer laptop selected. Connect your Ethernet cable or wait for auto-discovery.', 'warning');
+    return;
+  }
+
+  const [peerIp, peerPortStr] = peerTarget.split(':');
+  const peerPort = parseInt(peerPortStr, 10) || 52100;
+
+  try {
+    const res = await window.pywebview.api.p2p_start_transfer(peerIp, source, peerPort);
+    if (res && res.success) {
+      state.isP2PRunning = true;
+      document.getElementById('btnP2PStart').style.display = 'none';
+      document.getElementById('btnP2PStop').style.display = 'inline-block';
+      showToast(`⚡ Direct socket stream connected to ${peerIp}! Streaming with chunk CRC32…`, 'success');
+    } else {
+      showToast(`Could not connect: ${res.message}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Direct transfer error: ${err}`, 'error');
+  }
+}
+
+async function stopP2PTransfer() {
+  try {
+    await window.pywebview.api.p2p_stop_transfer();
+    state.isP2PRunning = false;
+    document.getElementById('btnP2PStart').style.display = 'inline-block';
+    document.getElementById('btnP2PStop').style.display = 'none';
+    showToast('Direct socket transfer stopped.', 'warning');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function applyP2PSenderTelemetry(data) {
+  if (!state.isP2PRunning && !data.is_running) return;
+
+  const wasRunning = state.isP2PRunning;
+  state.isP2PRunning = data.is_running;
+
+  document.getElementById('btnP2PStart').style.display = state.isP2PRunning ? 'none' : 'inline-block';
+  document.getElementById('btnP2PStop').style.display = state.isP2PRunning ? 'inline-block' : 'none';
+
+  // Speed and progress updates
+  const spd = data.speed_bps || 0;
+  const spdMb = spd / (1024 * 1024);
+  document.getElementById('sourceUploadSpeed').innerText = data.speed_formatted || '0 B/s';
+  document.getElementById('destDownloadSpeed').innerText = data.speed_formatted || '0 B/s';
+
+  // Sparkline
+  if (state.isP2PRunning) {
+    state.speedHistory.push({ time: Date.now(), upload: spdMb, download: spdMb });
+    if (state.speedHistory.length > 50) state.speedHistory.shift();
+    renderSparkline(state.speedHistory);
+  }
+
+  // Progress Ring
+  const pct = Math.min(100, Math.max(0, data.progress_percent || 0));
+  document.getElementById('progressPercentValue').innerText = `${pct.toFixed(0)}%`;
+  const ring = document.getElementById('progressRingFill');
+  if (ring) {
+    const offset = RING_CIRCUMFERENCE - (pct / 100 * RING_CIRCUMFERENCE);
+    ring.style.strokeDashoffset = `${offset}`;
+  }
+
+  document.getElementById('progressBytesCaption').innerText = `${data.bytes_formatted || '0 B'} / ${data.total_bytes_formatted || '0 B'}`;
+  document.getElementById('etaDisplayValue').innerText = data.eta_formatted || '--:--:--';
+  document.getElementById('elapsedCaption').innerText = `Elapsed: ${data.elapsed_formatted || '00:00:00'}`;
+  document.getElementById('filesCountValue').innerText = (data.files_sent || 0).toLocaleString();
+  document.getElementById('filesTotalSub').innerText = `of ${(data.total_files || 0).toLocaleString()} files`;
+
+  if (data.current_file) {
+    document.getElementById('activeFileDisplay').innerText = data.current_file;
+  }
+
+  // Finished event
+  if (wasRunning && !data.is_running) {
+    showToast('⚡ Direct Transfer Complete! 100% Bit-Safe Cryptographic SHA-256 Verified!', 'success');
+    refreshSystemOverview(true);
+    loadHistory();
+  }
+}
+
+function applyP2PReceiverTelemetry(data) {
+  const p2pDirEl = document.getElementById('p2pDestDirText');
+  if (p2pDirEl && data.dest_dir) p2pDirEl.innerText = data.dest_dir;
+
+  const box = document.getElementById('p2pReceiveProgressBox');
+  if (!box) return;
+
+  if (data.is_receiving) {
+    box.style.display = 'block';
+    document.getElementById('p2pReceiveFileText').innerText = `Inbound: ${data.current_file || 'Streaming chunks…'}`;
+    document.getElementById('p2pReceiveSpeedText').innerText = data.speed_formatted || '0 B/s';
+    const fill = document.getElementById('p2pReceiveProgressFill');
+    if (fill) fill.style.width = `${data.progress_percent || 0}%`;
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+async function changeP2PDestFolder() {
+  try {
+    const cur = document.getElementById('p2pDestDirText')?.innerText || '';
+    const res = await window.pywebview.api.browse_folder(cur, 'Select Incoming Download Folder');
+    if (res && res.success && res.path) {
+      await window.pywebview.api.p2p_set_receiver_dest(res.path);
+      document.getElementById('p2pDestDirText').innerText = res.path;
+      showToast(`Incoming folder set to: ${res.path}`, 'success');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
 
 function formatBytes(bytes) {
   if (bytes === null || bytes === undefined || bytes < 0) return '0 B';

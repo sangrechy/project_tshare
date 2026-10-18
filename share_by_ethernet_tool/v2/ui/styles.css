@@ -1623,6 +1623,60 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* ==========================================================================
+   P2P AUTO-DISCOVERY RADAR & DIRECT SOCKET CONTROLS
+   ========================================================================== */
+
+.p2p-radar-card {
+  margin-bottom: 1.25rem;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+.p2p-radar-pulse {
+  width: 14px;
+  height: 14px;
+  background-color: var(--success);
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  box-shadow: 0 0 10px var(--success);
+  animation: radarPulse 2s infinite ease-out;
+}
+
+@keyframes radarPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.peer-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: var(--dest-light);
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.peer-badge-btn:hover {
+  background: rgba(56, 189, 248, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+}
+
 /* Responsive adjustments */
 @media (max-width: 1050px) {
   .dual-deck-layout, .inventory-grid {
@@ -1632,3 +1686,4 @@ body {
     grid-template-columns: 1fr;
   }
 }
+

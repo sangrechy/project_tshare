@@ -1,7 +1,11 @@
 """Unified Bridge connecting Web UI to Backend Engines.
 
 Exposes high-performance Python methods to JavaScript via PyWebView (window.pywebview.api)
-and coordinates Transfer, Verification, Receiver, Network Telemetry, and History.
+and coordinates Transfer, Verification, Receiver, Network Telemetry, Peer-to-Peer Auto-Discovery,
+Direct High-Speed Socket Streaming, and History.
+
+All internal references are strictly private (prefixed with '_') to prevent PyWebView
+from reflecting native .NET COM objects and causing recursion/threading exceptions.
 """
 from __future__ import annotations
 
@@ -12,6 +16,8 @@ import threading
 from typing import Any, Callable, Dict, List, Optional
 
 from . import history_db, network_detector
+from .p2p_discovery import get_discovery_engine
+from .p2p_transfer import P2PReceiverServer, P2PSenderClient
 from .receiver_engine import ReceiverEngine
 from .transfer_engine import TransferEngine
 from .verify_engine import VerificationEngine
@@ -26,14 +32,50 @@ class UnifiedBridge:
         window_ref: Any = None,
         cleanup_info: Optional[dict[str, Any]] = None,
     ) -> None:
-        self.transfer = transfer_engine
-        self.verify = verify_engine
-        self.receiver = receiver_engine
-        self.window = window_ref
-        self.cleanup_info = cleanup_info
+        self._transfer = transfer_engine
+        self._verify = verify_engine
+        self._receiver = receiver_engine
+        self._window = window_ref
+        self._cleanup_info = cleanup_info
+
+        # Autonomous Peer-to-Peer & Direct Socket Engines
+        self._discovery = get_discovery_engine()
+        self._p2p_receiver = P2PReceiverServer()
+        self._p2p_receiver.start()  # Autonomously start listening for direct streams
+        self._p2p_sender = P2PSenderClient()
 
     def set_window(self, window_ref: Any) -> None:
-        self.window = window_ref
+        self._window = window_ref
+
+    # ----------------------------------------------------
+    # PEER AUTO-DISCOVERY & DIRECT P2P TRANSFER (AUTONOMOUS)
+    # ----------------------------------------------------
+    def get_discovered_peers(self) -> list[dict[str, Any]]:
+        """Return active peers auto-discovered over direct Ethernet or local network."""
+        return self._discovery.get_peers()
+
+    def p2p_start_transfer(self, peer_ip: str, source_path: str, peer_port: int = 52100) -> dict[str, Any]:
+        """Initiate direct high-speed socket file transfer to peer."""
+        ok, msg = self._p2p_sender.start_transfer(peer_ip=peer_ip, source_path=source_path, peer_port=peer_port)
+        return {"success": ok, "message": msg}
+
+    def p2p_stop_transfer(self) -> dict[str, Any]:
+        """Cancel direct socket file transfer."""
+        ok, msg = self._p2p_sender.stop_transfer()
+        return {"success": ok, "message": msg}
+
+    def get_p2p_sender_telemetry(self) -> dict[str, Any]:
+        """Return live sender telemetry (bytes, speed, ETA, verified file count)."""
+        return self._p2p_sender.get_telemetry()
+
+    def get_p2p_receiver_telemetry(self) -> dict[str, Any]:
+        """Return live receiver telemetry (inbound bytes, files, speed, status)."""
+        return self._p2p_receiver.get_telemetry()
+
+    def p2p_set_receiver_dest(self, folder_path: str) -> dict[str, Any]:
+        """Change destination directory for direct incoming socket transfers."""
+        self._p2p_receiver.set_dest_dir(folder_path)
+        return {"success": True, "dest_dir": self._p2p_receiver.dest_dir}
 
     # ----------------------------------------------------
     # SYSTEM & HARDWARE OVERVIEW
@@ -45,10 +87,13 @@ class UnifiedBridge:
         drives = network_detector.get_disk_drives()
         shares = network_detector.get_windows_shares()
         stats = history_db.get_stats_summary()
+        peers = self._discovery.get_peers()
 
-        transfer_status = self.transfer.get_telemetry()
-        verify_status = self.verify.get_status()
-        receiver_status = self.receiver.get_status()
+        transfer_status = self._transfer.get_telemetry()
+        verify_status = self._verify.get_status()
+        receiver_status = self._receiver.get_status()
+        p2p_recv_status = self._p2p_receiver.get_telemetry()
+        p2p_send_status = self._p2p_sender.get_telemetry()
 
         return {
             "machine": machine_info,
@@ -56,10 +101,13 @@ class UnifiedBridge:
             "drives": drives,
             "shares": shares,
             "stats": stats,
+            "peers": peers,
             "active_transfer": transfer_status,
             "active_verify": verify_status,
             "active_receiver": receiver_status,
-            "startup_cleanup": self.cleanup_info,
+            "p2p_receiver": p2p_recv_status,
+            "p2p_sender": p2p_send_status,
+            "startup_cleanup": self._cleanup_info,
         }
 
     def test_latency(self, host_or_path: str) -> dict[str, Any]:
@@ -72,14 +120,14 @@ class UnifiedBridge:
         }
 
     def browse_folder(self, initial_dir: str = "", title: str = "Select Folder") -> dict[str, Any]:
-        """Open native Windows folder selection dialog."""
+        """Open native folder selection dialog."""
         selected_path: str | None = None
 
         # 1. Try PyWebView native dialog if window is available
-        if self.window and hasattr(self.window, "create_file_dialog"):
+        if self._window and hasattr(self._window, "create_file_dialog"):
             try:
                 import webview
-                result = self.window.create_file_dialog(
+                result = self._window.create_file_dialog(
                     webview.FileDialog.FOLDER,
                     directory=initial_dir if (initial_dir and os.path.exists(initial_dir)) else "",
                 )
@@ -128,7 +176,7 @@ class UnifiedBridge:
             return {"success": False, "message": str(e)}
 
     # ----------------------------------------------------
-    # TRANSFER / SENDER METHODS
+    # TRANSFER / SENDER METHODS (ROBOCOPY / RSYNC)
     # ----------------------------------------------------
     def start_transfer(self, options: dict[str, Any]) -> dict[str, Any]:
         source = str(options.get("source", ""))
@@ -142,7 +190,7 @@ class UnifiedBridge:
         retry_wait = int(options.get("retry_wait", 2))
         auto_verify = bool(options.get("auto_verify", False))
 
-        ok, msg = self.transfer.start_transfer(
+        ok, msg = self._transfer.start_transfer(
             source_path=source,
             dest_path=dest,
             threads=threads,
@@ -157,7 +205,7 @@ class UnifiedBridge:
         return {"success": ok, "message": msg}
 
     def stop_transfer(self) -> dict[str, Any]:
-        ok, msg = self.transfer.stop_transfer()
+        ok, msg = self._transfer.stop_transfer()
         try:
             from platforms import get_active_share_lease
             lease = get_active_share_lease()
@@ -168,21 +216,21 @@ class UnifiedBridge:
         return {"success": ok, "message": msg}
 
     def get_transfer_telemetry(self) -> dict[str, Any]:
-        return self.transfer.get_telemetry()
+        return self._transfer.get_telemetry()
 
     def scan_source(self) -> dict[str, Any]:
-        self.transfer.start_background_scan()
+        self._transfer.start_background_scan()
         return {"success": True, "message": "Source scan started."}
 
     # ----------------------------------------------------
     # RECEIVER METHODS
     # ----------------------------------------------------
     def start_receiver_monitoring(self, folder_path: str) -> dict[str, Any]:
-        ok, msg = self.receiver.start_monitoring(folder_path)
+        ok, msg = self._receiver.start_monitoring(folder_path)
         return {"success": ok, "message": msg}
 
     def stop_receiver_monitoring(self) -> dict[str, Any]:
-        self.receiver.stop_monitoring()
+        self._receiver.stop_monitoring()
         try:
             from platforms import get_active_share_lease
             lease = get_active_share_lease()
@@ -193,7 +241,7 @@ class UnifiedBridge:
         return {"success": True, "message": "Receiver monitoring stopped."}
 
     def get_receiver_status(self) -> dict[str, Any]:
-        return self.receiver.get_status()
+        return self._receiver.get_status()
 
     def create_share(self, folder_path: str, share_name: str) -> dict[str, Any]:
         ok, msg = network_detector.create_network_share(folder_path, share_name)
@@ -213,7 +261,7 @@ class UnifiedBridge:
         mode: str = "metadata",
         workers: int = 4,
     ) -> dict[str, Any]:
-        ok, msg = self.verify.start_verification(
+        ok, msg = self._verify.start_verification(
             source_path=source_path,
             dest_path=dest_path,
             mode=mode,
@@ -222,15 +270,15 @@ class UnifiedBridge:
         return {"success": ok, "message": msg}
 
     def stop_verification(self) -> dict[str, Any]:
-        self.verify.stop_verification()
+        self._verify.stop_verification()
         return {"success": True, "message": "Verification stopped."}
 
     def get_verifier_status(self) -> dict[str, Any]:
-        return self.verify.get_status()
+        return self._verify.get_status()
 
     def export_verification_report(self) -> dict[str, Any]:
         try:
-            path = self.verify.export_html_report()
+            path = self._verify.export_html_report()
             if os.path.exists(path):
                 if hasattr(os, "startfile"):
                     os.startfile(path)
