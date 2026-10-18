@@ -195,17 +195,17 @@ nohup bash -c '
 
 def _configure_windows(parent_pid: int, backup_path: str) -> Dict[str, Any]:
     trigger_path = TRIGGER_FILE
-    # Escape backslashes for PowerShell strings
     bpath_esc = backup_path.replace("\\", "\\\\")
     tpath_esc = trigger_path.replace("\\", "\\\\")
+    watchdog_file = os.path.join(tempfile.gettempdir(), "tshare_win_watchdog.ps1").replace("\\", "\\\\")
 
-    ps_script = f'''
+    ps_script = f'''# T-Share v3 Windows Direct Ethernet Setup
 $eth = Get-NetAdapter | Where-Object {{ $_.InterfaceDescription -notmatch "Wi-Fi|Wireless|Virtual|Hyper-V|TAP" -and $_.Status -eq "Up" }} | Select-Object -First 1
 if (-not $eth) {{ exit 1 }}
 
 $idx = $eth.ifIndex
 $hadDhcp = (Get-NetIPInterface -InterfaceIndex $idx -AddressFamily IPv4).Dhcp -eq 'Enabled'
-$curIps = (Get-NetIPAddress -InterfaceIndex $idx -AddressFamily IPv4 | Where-Object {{ $_.IPAddress -notlike "169.254.*" -and $_.IPAddress -notlike "127.*" }}).IPAddress
+$curIps = (Get-NetIPAddress -InterfaceIndex $idx -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object {{ $_.IPAddress -notlike "169.254.*" -and $_.IPAddress -notlike "127.*" }}).IPAddress
 
 $state = @{{
   platform = "windows"
@@ -227,8 +227,8 @@ if (-not $hasSubnet) {{
   New-NetIPAddress -InterfaceIndex $idx -IPAddress 192.168.123.1 -PrefixLength 24 -ErrorAction SilentlyContinue
 }}
 
-# 3. Launch background watchdog process
-$watchdogCmd = @"
+# 3. Launch background watchdog script
+$watchdogScript = @"
 `$ppid = {parent_pid}
 `$bfile = '{bpath_esc}'
 `$tfile = '{tpath_esc}'
@@ -249,12 +249,19 @@ if (`$hadDhcp -eq 'True') {{
 }}
 
 Remove-Item -Path `$bfile, `$tfile -Force -ErrorAction SilentlyContinue
+Remove-Item -Path '{watchdog_file}' -Force -ErrorAction SilentlyContinue
 "@
-
-Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -Command $watchdogCmd"
+$watchdogScript | Set-Content -Path "{watchdog_file}" -Force
+Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"{watchdog_file}`""
 '''
-    cmd = f'Start-Process powershell -Verb runAs -ArgumentList \'-NoProfile -Command "{ps_script}"\''
+
+    # Write setup script to temporary file and execute via -File to avoid PowerShell string format errors
+    setup_file = os.path.join(tempfile.gettempdir(), "tshare_win_setup.ps1")
     try:
+        with open(setup_file, "w", encoding="utf-8") as f:
+            f.write(ps_script)
+
+        cmd = f'Start-Process powershell -Verb runAs -ArgumentList \'-NoProfile -ExecutionPolicy Bypass -File "{setup_file}"\''
         subprocess.Popen(["powershell", "-NoProfile", "-Command", cmd])
         return {"success": True, "message": "Windows UAC confirmation triggered."}
     except Exception as e:

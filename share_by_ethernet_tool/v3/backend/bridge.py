@@ -221,7 +221,8 @@ class BridgeAPI:
         """Sender folder selection dialog."""
         try:
             if self._window:
-                folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+                dialog_type = getattr(getattr(webview, 'FileDialog', None), 'FOLDER', getattr(webview, 'FOLDER_DIALOG', 20))
+                folders = self._window.create_file_dialog(dialog_type)
             else:
                 folders = self._pick_paths_fallback(folder=True, multiple=False, title="Select Folder to Send")
 
@@ -268,7 +269,8 @@ class BridgeAPI:
         """Receiver destination selection dialog."""
         try:
             if self._window:
-                folders = self._window.create_file_dialog(webview.FOLDER_DIALOG)
+                dialog_type = getattr(getattr(webview, 'FileDialog', None), 'FOLDER', getattr(webview, 'FOLDER_DIALOG', 20))
+                folders = self._window.create_file_dialog(dialog_type)
             else:
                 folders = self._pick_paths_fallback(folder=True, multiple=False, title="Select Destination Folder")
 
