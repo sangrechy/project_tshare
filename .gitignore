@@ -37,3 +37,6 @@ Thumbs.db
 *.db
 share_lease.json
 tshare_history.db
+.tshare_*
+*.tshare_state*
+

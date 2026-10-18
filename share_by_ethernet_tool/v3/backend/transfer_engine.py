@@ -85,6 +85,21 @@ class TransferEngine:
         self._thread = threading.Thread(target=self._run_transfer, daemon=True, name="SenderThread")
         self._thread.start()
 
+    def resume_transfer(self) -> Dict[str, Any]:
+        """Resumes an interrupted or disconnected transfer from disk journal."""
+        if self.is_active():
+            return {"success": False, "error": "A transfer is currently active"}
+        if not hasattr(self, 'target_ip') or not self.target_ip or not self.source_paths:
+            return {"success": False, "error": "No previous transfer session found to resume"}
+
+        self._cancel_requested = False
+        self.status = "connecting"
+        self.error_message = ""
+        self.receiver_status_message = "Reconnecting to resume transfer..."
+        self._thread = threading.Thread(target=self._run_transfer, daemon=True, name="SenderResumeThread")
+        self._thread.start()
+        return {"success": True}
+
     def get_telemetry(self) -> Dict[str, Any]:
         """Provides snapshot of live sender state."""
         return {

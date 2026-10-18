@@ -14,7 +14,7 @@ from .transfer_engine import TransferEngine
 from .receiver_engine import ReceiverEngine
 from .discovery import PeerDiscovery
 from .history_db import HistoryDatabase
-from .hardware_info import get_hardware_telemetry, get_network_interfaces
+from .hardware_info import get_hardware_telemetry, get_network_interfaces, get_detailed_network_info
 from .verify_engine import VerifyEngine
 
 
@@ -40,6 +40,10 @@ class BridgeAPI:
             "bandwidth_limit_mbps": 0  # 0 = uncapped
         }
 
+        # Check and restore any leftover network state from previous interrupted sessions
+        from .network_config import check_and_restore_leftover_backup
+        check_and_restore_leftover_backup()
+
     def set_window(self, window: webview.Window) -> None:
         self._window = window
 
@@ -49,11 +53,13 @@ class BridgeAPI:
         self._discovery.start()
 
     def stop_background_services(self) -> None:
-        """Stops background engines."""
+        """Stops background engines and ensures temporary network settings revert."""
         self._discovery.stop()
         self._receiver.stop()
         self._transfer.cancel()
         self._verify.cancel()
+        from .network_config import revert_direct_ethernet
+        revert_direct_ethernet()
 
     # ------------------ TELEMETRY & STATUS ------------------
 
@@ -62,10 +68,16 @@ class BridgeAPI:
         active_role = "none"
         active_data = {}
 
-        if self._transfer.is_active() or self._transfer.status in ["completed", "rejected", "error"]:
+        can_resume = (
+            self._transfer.status in ["error", "cancelled"] and 
+            bool(getattr(self._transfer, "target_ip", None)) and
+            bool(getattr(self._transfer, "source_paths", None))
+        )
+
+        if self._transfer.is_active() or self._transfer.status in ["completed", "rejected", "error", "cancelled"]:
             active_role = "sender"
             active_data = self._transfer.get_telemetry()
-        elif self._receiver.status in ["waiting_user", "receiving", "completed", "error"]:
+        elif self._receiver.status in ["waiting_user", "receiving", "completed", "error", "cancelled"]:
             active_role = "receiver"
             active_data = self._receiver.get_telemetry()
 
@@ -74,7 +86,8 @@ class BridgeAPI:
                 self._receiver.active_destination or "."
             ),
             "active_role": active_role,
-            "transfer": active_data
+            "transfer": active_data,
+            "can_resume": can_resume
         }
 
     def get_discovered_peers(self) -> List[Dict[str, Any]]:
@@ -82,13 +95,37 @@ class BridgeAPI:
         return self._discovery.get_peers()
 
     def get_my_network_info(self) -> Dict[str, Any]:
-        """Provides Receiver's direct IP:Port for the manual connection pill."""
+        """Provides detailed Wi-Fi and Ethernet network module information."""
+        details = get_detailed_network_info()
         ifaces = get_network_interfaces()
         primary_ip = ifaces[0]["ip"] if ifaces else "127.0.0.1"
+        port = self._receiver.port
+
+        wifi_obj = details.get("wifi")
+        eth_obj = details.get("ethernet")
+
+        wifi_addr = f"{wifi_obj['ip']}:{port}" if (wifi_obj and wifi_obj.get("has_ip")) else "Disconnected"
+        eth_addr = f"{eth_obj['ip']}:{port}" if (eth_obj and eth_obj.get("has_ip")) else ("Unconfigured (Click Setup)" if eth_obj else "No Cable Detected")
+
         return {
-            "ip": primary_ip,
-            "port": self._receiver.port,
-            "display_address": f"{primary_ip}:{self._receiver.port}"
+            "primary_ip": primary_ip,
+            "port": port,
+            "display_address": f"{primary_ip}:{port}",
+            "wifi": {
+                "available": bool(wifi_obj),
+                "name": wifi_obj["name"] if wifi_obj else "Wi-Fi",
+                "ip": wifi_obj["ip"] if wifi_obj else "",
+                "address": wifi_addr,
+                "has_ip": wifi_obj["has_ip"] if wifi_obj else False
+            },
+            "ethernet": {
+                "available": bool(eth_obj),
+                "name": eth_obj["name"] if eth_obj else "Ethernet",
+                "ip": eth_obj["ip"] if eth_obj else "",
+                "address": eth_addr,
+                "has_ip": eth_obj["has_ip"] if eth_obj else False,
+                "needs_setup": bool(eth_obj and not eth_obj.get("has_ip"))
+            }
         }
 
     # ------------------ FILE & FOLDER PICKERS ------------------
@@ -294,6 +331,20 @@ class BridgeAPI:
         self._transfer.cancel()
         self._receiver.cancel_transfer()
         return {"success": True}
+
+    def resume_transfer(self) -> Dict[str, Any]:
+        """Resumes an interrupted or disconnected transfer from Home screen."""
+        return self._transfer.resume_transfer()
+
+    def configure_ethernet(self) -> Dict[str, Any]:
+        """Triggers native OS privilege elevation popup (Polkit/pkexec or Windows UAC) to auto-configure direct Ethernet."""
+        from .network_config import configure_direct_ethernet
+        return configure_direct_ethernet()
+
+    def revert_ethernet(self) -> Dict[str, Any]:
+        """Manually or automatically reverts temporary Ethernet IP and firewall settings back to normal."""
+        from .network_config import revert_direct_ethernet
+        return revert_direct_ethernet()
 
     # ------------------ VERIFICATION & HISTORY ------------------
 

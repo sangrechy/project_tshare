@@ -32,6 +32,7 @@ if (!window.pywebview) {
 
 // Application State
 let activeTab = 'home';
+let selectedMedium = 'ethernet';
 let selectedTargetIp = '';
 let selectedTargetPort = 52001;
 let selectedVerifySessionId = null;
@@ -47,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupVerifyControls();
   setupSettingsControls();
   setupEmergencyControls();
+  setupResumeControls();
 
   // Listen for manual IP changes to update target status in real time
   const manualIp = document.getElementById('manualIpInput');
@@ -202,6 +204,23 @@ async function updateTelemetry() {
       document.getElementById('homeHardwareView').classList.remove('hidden');
     }
 
+    // Check if an interrupted transfer can be resumed
+    const resumeAlert = document.getElementById('disconnectedResumeAlert');
+    const btnResumeHeader = document.getElementById('btnResumeTransfer');
+    if (data.can_resume) {
+      if (resumeAlert) {
+        resumeAlert.classList.remove('hidden');
+        const reasonEl = document.getElementById('disconnectedReasonText');
+        if (reasonEl && transfer && transfer.receiver_status) {
+          reasonEl.textContent = `Interrupted: ${transfer.receiver_status}. Verified blocks are safely journaled on disk. Click Resume below to continue streaming.`;
+        }
+      }
+      if (btnResumeHeader) btnResumeHeader.classList.remove('hidden');
+    } else {
+      if (resumeAlert) resumeAlert.classList.add('hidden');
+      if (btnResumeHeader) btnResumeHeader.classList.add('hidden');
+    }
+
     // 4. Update Send Tab Honest Connection Status Nodes
     const sDot = document.getElementById('senderStatusDot');
     const sText = document.getElementById('senderStatusText');
@@ -279,6 +298,32 @@ function updateTargetReceiverStatus() {
 // ----------------- SEND TAB CONTROLS -----------------
 
 function setupSendControls() {
+  // Medium Selector: Ethernet vs Wi-Fi
+  const btnEth = document.getElementById('btnModeEthernet');
+  const btnWifi = document.getElementById('btnModeWifi');
+  const manualIp = document.getElementById('manualIpInput');
+  const scanBadge = document.getElementById('scanStatusBadge');
+
+  if (btnEth && btnWifi) {
+    btnEth.addEventListener('click', () => {
+      selectedMedium = 'ethernet';
+      btnEth.classList.add('active');
+      btnWifi.classList.remove('active');
+      if (manualIp) manualIp.placeholder = "192.168.123.x (Direct Wire)";
+      if (scanBadge) scanBadge.textContent = "Scanning Ethernet...";
+      refreshDiscoveredPeers();
+    });
+
+    btnWifi.addEventListener('click', () => {
+      selectedMedium = 'wifi';
+      btnWifi.classList.add('active');
+      btnEth.classList.remove('active');
+      if (manualIp) manualIp.placeholder = "192.168.1.x (Wi-Fi LAN)";
+      if (scanBadge) scanBadge.textContent = "Scanning Wi-Fi...";
+      refreshDiscoveredPeers();
+    });
+  }
+
   document.getElementById('btnSelectFiles').addEventListener('click', async () => {
     if (!window.pywebview) return;
     const res = await window.pywebview.api.select_source_files();
@@ -360,7 +405,10 @@ async function refreshDiscoveredPeers() {
     list.innerHTML = '';
 
     if (!peers || peers.length === 0) {
-      list.innerHTML = '<div class="empty-peers">Looking for peers on direct Ethernet cable...</div>';
+      const msg = (selectedMedium === 'ethernet')
+        ? 'Looking for peers on direct Ethernet cable...'
+        : 'Looking for peers on Wi-Fi network...';
+      list.innerHTML = `<div class="empty-peers">${msg}</div>`;
       return;
     }
 
@@ -369,10 +417,15 @@ async function refreshDiscoveredPeers() {
       div.className = 'peer-item';
       if (peer.ip === selectedTargetIp) div.classList.add('selected');
 
+      const isEth = peer.is_direct_ethernet;
+      const tagHtml = isEth
+        ? '<span class="badge-speed" style="margin-left:6px;">Ethernet Wire</span>'
+        : '<span class="badge-scan" style="margin-left:6px;">Wi-Fi LAN</span>';
+
       div.innerHTML = `
         <div>
-          <div class="peer-name">${peer.name}</div>
-          <div class="peer-ip">${peer.ip}:${peer.port} ${peer.is_direct_ethernet ? '· Direct Wire' : ''}</div>
+          <div class="peer-name">${peer.name} ${tagHtml}</div>
+          <div class="peer-ip">${peer.ip}:${peer.port}</div>
         </div>
         <button class="btn-primary btn-sm">Select</button>
       `;
@@ -417,11 +470,61 @@ function setupReceiveControls() {
     });
   }
 
-  document.getElementById('btnCopyAddress').addEventListener('click', () => {
-    const text = document.getElementById('receiverAddressPill').textContent;
-    navigator.clipboard.writeText(text);
-    alert(`Copied direct address: ${text}`);
-  });
+  // Copy Ethernet address
+  const btnCopyEth = document.getElementById('btnCopyEthAddress');
+  if (btnCopyEth) {
+    btnCopyEth.addEventListener('click', () => {
+      const text = document.getElementById('receiverEthAddressPill').textContent;
+      navigator.clipboard.writeText(text);
+      alert(`Copied Ethernet address: ${text}`);
+    });
+  }
+
+  // Copy Wi-Fi address
+  const btnCopyWifi = document.getElementById('btnCopyWifiAddress');
+  if (btnCopyWifi) {
+    btnCopyWifi.addEventListener('click', () => {
+      const text = document.getElementById('receiverWifiAddressPill').textContent;
+      navigator.clipboard.writeText(text);
+      alert(`Copied Wi-Fi address: ${text}`);
+    });
+  }
+
+  // Auto-Setup Ethernet Wire button (native OS elevation popup)
+  const btnSetupEth = document.getElementById('btnSetupEthWire');
+  if (btnSetupEth) {
+    btnSetupEth.addEventListener('click', async () => {
+      btnSetupEth.disabled = true;
+      btnSetupEth.textContent = "Requesting Auth...";
+      try {
+        if (window.pywebview) {
+          const res = await window.pywebview.api.configure_ethernet();
+          if (res && res.success) {
+            alert("Temporary direct Ethernet setup initiated!\nApprove the OS authentication dialog (Polkit / UAC) if prompted.\nSettings will automatically revert when you close the app.");
+            setTimeout(loadNetworkPill, 2500);
+            setTimeout(loadNetworkPill, 5000);
+          } else {
+            alert(`Setup error: ${res ? res.error : "Unknown error"}`);
+          }
+        }
+      } catch (err) {
+        alert(`Error: ${err}`);
+      } finally {
+        btnSetupEth.disabled = false;
+        btnSetupEth.textContent = "⚡ Auto-Setup (Popup)";
+      }
+    });
+  }
+
+  // Legacy copy address button
+  const btnLegacyCopy = document.getElementById('btnCopyAddress');
+  if (btnLegacyCopy) {
+    btnLegacyCopy.addEventListener('click', () => {
+      const text = document.getElementById('receiverAddressPill').textContent;
+      navigator.clipboard.writeText(text);
+      alert(`Copied direct address: ${text}`);
+    });
+  }
 
   document.getElementById('btnAcceptReceive').addEventListener('click', acceptCurrentOffer);
   document.getElementById('btnBannerAccept').addEventListener('click', () => {
@@ -436,12 +539,83 @@ async function loadNetworkPill() {
   if (!window.pywebview) return;
   try {
     const info = await window.pywebview.api.get_my_network_info();
-    if (info) {
-      document.getElementById('receiverAddressPill').textContent = info.display_address;
+    if (!info) return;
+
+    // Ethernet Module Pill
+    const ethPill = document.getElementById('receiverEthAddressPill');
+    const ethSetupBtn = document.getElementById('btnSetupEthWire');
+    const ethBadge = document.getElementById('ethSpeedBadge');
+
+    if (info.ethernet) {
+      if (info.ethernet.has_ip) {
+        if (ethPill) ethPill.textContent = info.ethernet.address;
+        if (ethSetupBtn) ethSetupBtn.classList.add('hidden');
+        if (ethBadge) ethBadge.textContent = "Active · 1 Gbps";
+      } else {
+        if (ethPill) ethPill.textContent = info.ethernet.address || "Unconfigured (Click Setup)";
+        if (ethSetupBtn) ethSetupBtn.classList.remove('hidden');
+        if (ethBadge) ethBadge.textContent = "Needs Setup";
+      }
     }
+
+    // Wi-Fi Module Pill
+    const wifiPill = document.getElementById('receiverWifiAddressPill');
+    const wifiBadge = document.getElementById('wifiStatusBadge');
+
+    if (info.wifi) {
+      if (info.wifi.has_ip) {
+        if (wifiPill) wifiPill.textContent = info.wifi.address;
+        if (wifiBadge) {
+          wifiBadge.textContent = "Active";
+          wifiBadge.className = "badge-speed";
+        }
+      } else {
+        if (wifiPill) wifiPill.textContent = "Wi-Fi Disconnected";
+        if (wifiBadge) {
+          wifiBadge.textContent = "Inactive";
+          wifiBadge.className = "badge-scan";
+        }
+      }
+    }
+
+    // Legacy address pill
+    const legacyPill = document.getElementById('receiverAddressPill');
+    if (legacyPill) legacyPill.textContent = info.display_address;
   } catch (err) {
-    console.error(err);
+    console.error("loadNetworkPill error:", err);
   }
+}
+
+// ----------------- RESUME INTERRUPTED TRANSFER -----------------
+
+function setupResumeControls() {
+  const doResume = async () => {
+    const btnHome = document.getElementById('btnHomeResume');
+    const btnHeader = document.getElementById('btnResumeTransfer');
+    if (btnHome) btnHome.disabled = true;
+    if (btnHeader) btnHeader.disabled = true;
+
+    try {
+      if (window.pywebview) {
+        const res = await window.pywebview.api.resume_transfer();
+        if (res && res.success) {
+          switchTab('home');
+        } else {
+          alert(`Failed to resume transfer: ${res ? res.error : "Unknown error"}`);
+        }
+      }
+    } catch (err) {
+      alert(`Resume error: ${err}`);
+    } finally {
+      if (btnHome) btnHome.disabled = false;
+      if (btnHeader) btnHeader.disabled = false;
+    }
+  };
+
+  const btnHome = document.getElementById('btnHomeResume');
+  const btnHeader = document.getElementById('btnResumeTransfer');
+  if (btnHome) btnHome.addEventListener('click', doResume);
+  if (btnHeader) btnHeader.addEventListener('click', doResume);
 }
 
 function showIncomingOffer(offer) {

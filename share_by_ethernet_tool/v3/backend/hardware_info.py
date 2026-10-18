@@ -48,6 +48,51 @@ def get_network_interfaces() -> List[Dict[str, Any]]:
     interfaces.sort(key=lambda x: x["priority"])
     return interfaces
 
+def get_detailed_network_info() -> Dict[str, Any]:
+    """Returns categorized Wi-Fi and Ethernet connection modules."""
+    wifi_entry = None
+    eth_entry = None
+
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+
+        for name, addr_list in addrs.items():
+            stat = stats.get(name)
+            is_up = stat.isup if stat else True
+            speed_mbps = stat.speed if stat and stat.speed > 0 else 1000
+
+            lname = name.lower()
+            is_wifi = any(w in lname for w in ["wl", "wi-fi", "wifi", "wireless", "802.11"])
+            is_eth = any(e in lname for e in ["eth", "en", "ethernet", "lan", "realtek", "intel"]) and not is_wifi
+
+            ipv4 = ""
+            for addr in addr_list:
+                if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                    ipv4 = addr.address
+                    break
+
+            info = {
+                "name": name,
+                "ip": ipv4,
+                "is_up": is_up,
+                "speed_mbps": speed_mbps,
+                "has_ip": bool(ipv4),
+                "display": ipv4 if ipv4 else "Unconfigured"
+            }
+
+            if is_wifi and not wifi_entry:
+                wifi_entry = info
+            elif is_eth and not eth_entry:
+                eth_entry = info
+    except Exception:
+        pass
+
+    return {
+        "wifi": wifi_entry,
+        "ethernet": eth_entry
+    }
+
 
 def get_primary_ip() -> str:
     """Returns the most appropriate IP address for direct transfer."""

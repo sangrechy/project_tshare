@@ -1064,5 +1064,163 @@ input:checked + .slider:before {
   justify-content: flex-end;
 }
 
+/* Medium Selector (Ethernet vs Wi-Fi) */
+.module-selector-box {
+  margin-bottom: 16px;
+}
+
+.module-toggle-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.btn-module {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #090d16;
+  border: 1px solid var(--bg-card-border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-module:hover {
+  border-color: var(--primary);
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.btn-module.active {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.15);
+  color: #ffffff;
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+.btn-module svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Network Module Cards (Receive Tab) */
+.network-module-card {
+  background: #090d16;
+  border: 1px solid var(--bg-card-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  transition: border-color 0.2s;
+}
+
+.network-module-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.module-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.module-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.module-title svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--cyan);
+}
+
+.badge-speed {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.connection-pill-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill-address {
+  flex: 1;
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cyan);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--bg-card-border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Interrupted Transfer Resume Alert */
+.resume-alert-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.alert-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alert-icon-wrap svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--warning);
+}
+
+.alert-body {
+  flex: 1;
+}
+
+.alert-body h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--warning);
+  margin-bottom: 4px;
+}
+
+.alert-body p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 /* Utilities */
 .hidden { display: none !important; }

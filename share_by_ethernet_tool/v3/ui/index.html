@@ -76,10 +76,16 @@
       <div id="homeActiveTransfer" class="transfer-dashboard hidden">
         <div class="dashboard-header">
           <div class="dashboard-badge-pulse" id="transferRoleBadge">TRANSMITTING (SENDER)</div>
-          <button id="btnEmergencyCancel" class="btn-danger btn-sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            Cancel Transfer
-          </button>
+          <div class="action-btn-row">
+            <button id="btnResumeTransfer" class="btn-primary btn-sm hidden">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Resume Transfer
+            </button>
+            <button id="btnEmergencyCancel" class="btn-danger btn-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              Cancel Transfer
+            </button>
+          </div>
         </div>
 
         <!-- Big Speedometer -->
@@ -119,6 +125,21 @@
 
       <!-- Idle Hardware Telemetry View -->
       <div id="homeHardwareView" class="hardware-overview">
+        <!-- Interrupted Transfer Resume Prompt -->
+        <div id="disconnectedResumeAlert" class="resume-alert-box hidden">
+          <div class="alert-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="alert-body">
+            <h4>Transfer Disconnected</h4>
+            <p id="disconnectedReasonText">Connection was lost. All verified blocks are saved on disk and can be resumed immediately.</p>
+          </div>
+          <button id="btnHomeResume" class="btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Resume Transfer
+          </button>
+        </div>
+
         <div class="overview-intro">
           <h2>System Telemetry & Link Status</h2>
           <p>Real-time link speed and hardware resources for zero-loss transfer.</p>
@@ -187,6 +208,21 @@
           <div class="form-card">
             <h3 class="card-title">1. Connect to Receiver</h3>
             
+            <!-- Connection Module Selector (Ethernet vs Wi-Fi) -->
+            <div class="module-selector-box">
+              <span class="field-label">Transfer Medium:</span>
+              <div class="module-toggle-group">
+                <button type="button" class="btn-module active" id="btnModeEthernet">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                  <span>Ethernet Cable (High-Speed)</span>
+                </button>
+                <button type="button" class="btn-module" id="btnModeWifi">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                  <span>Wi-Fi (Wireless LAN)</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Auto-Discovery List -->
             <div class="discovery-box">
               <div class="box-header">
@@ -317,14 +353,44 @@
             </div>
           </div>
 
-          <!-- Connection Pill -->
+          <!-- Dual Connection Address Cards -->
           <div class="form-card">
-            <h3 class="card-title">2. Direct Connect Address</h3>
-            <p class="card-desc">Share this address with the sender if auto-discovery is blocked by firewall.</p>
-            <div class="connection-pill-box">
-              <span class="pill-address" id="receiverAddressPill">169.254.x.x:52001</span>
-              <button id="btnCopyAddress" class="btn-secondary btn-sm">Copy</button>
+            <h3 class="card-title">2. Receiver Connection Addresses</h3>
+            <p class="card-desc">Connect using either direct Ethernet wire (max speed) or Wi-Fi.</p>
+            
+            <!-- Ethernet Module Card -->
+            <div class="network-module-card" id="cardEthModule">
+              <div class="module-header">
+                <div class="module-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                  <span>Ethernet Cable (Direct Wire)</span>
+                </div>
+                <span class="badge-speed" id="ethSpeedBadge">Up to 1 Gbps</span>
+              </div>
+              <div class="connection-pill-box">
+                <span class="pill-address" id="receiverEthAddressPill">Detecting wire...</span>
+                <button id="btnCopyEthAddress" class="btn-secondary btn-sm">Copy</button>
+                <button id="btnSetupEthWire" class="btn-primary btn-sm hidden" title="Pops up system prompt to configure IP & open firewall">⚡ Auto-Setup (Popup)</button>
+              </div>
             </div>
+
+            <!-- Wi-Fi Module Card -->
+            <div class="network-module-card" id="cardWifiModule" style="margin-top: 10px;">
+              <div class="module-header">
+                <div class="module-title">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                  <span>Wi-Fi (Wireless LAN)</span>
+                </div>
+                <span class="badge-scan" id="wifiStatusBadge">Active</span>
+              </div>
+              <div class="connection-pill-box">
+                <span class="pill-address" id="receiverWifiAddressPill">Detecting Wi-Fi...</span>
+                <button id="btnCopyWifiAddress" class="btn-secondary btn-sm">Copy</button>
+              </div>
+            </div>
+            <!-- Keep hidden fallback for backward compatibility -->
+            <span class="hidden" id="receiverAddressPill"></span>
+            <button id="btnCopyAddress" class="hidden"></button>
           </div>
         </div>
 

@@ -323,6 +323,77 @@ class TestTSHAREV3(unittest.TestCase):
             with open(dest_sub, 'rb') as f:
                 self.assertEqual(f.read(), sub_payload)
 
+    def test_13_detailed_network_info_and_modules(self):
+        from backend.hardware_info import get_detailed_network_info
+        from backend.bridge import BridgeAPI
+        
+        info = get_detailed_network_info()
+        self.assertIn("ethernet", info)
+        self.assertIn("wifi", info)
+        
+        bridge = BridgeAPI()
+        net_info = bridge.get_my_network_info()
+        self.assertIn("primary_ip", net_info)
+        self.assertIn("wifi", net_info)
+        self.assertIn("ethernet", net_info)
+        self.assertIn("needs_setup", net_info["ethernet"])
+
+    def test_14_temporary_network_backup_and_restore(self):
+        import json
+        from backend.network_config import (
+            get_backup_path, check_and_restore_leftover_backup, revert_direct_ethernet
+        )
+
+        bpath = get_backup_path()
+        if os.path.exists(bpath):
+            os.remove(bpath)
+
+        # 1. When no backup exists, check_and_restore returns False
+        self.assertFalse(check_and_restore_leftover_backup())
+
+        # 2. Simulate an interrupted session leaving a backup file
+        mock_backup = {
+            "platform": "windows" if sys.platform == "win32" else "linux",
+            "ifIndex": 9999,
+            "hadDhcp": True,
+            "hadIp": "",
+            "interface": "mock_eth",
+            "assigned_ip": "192.168.123.1"
+        }
+        with open(bpath, "w") as f:
+            json.dump(mock_backup, f)
+
+        self.assertTrue(os.path.exists(bpath))
+
+        # 3. Next startup detects leftover backup, reverts state, and removes backup file
+        restored = check_and_restore_leftover_backup()
+        self.assertTrue(restored)
+        self.assertFalse(os.path.exists(bpath))
+
+    def test_15_interrupted_transfer_resume(self):
+        with tempfile.TemporaryDirectory() as src:
+            test_file = os.path.join(src, 'resume_test.bin')
+            with open(test_file, 'wb') as f:
+                f.write(os.urandom(1024 * 1024))
+
+            sender = TransferEngine()
+            # Before transfer starts, cannot resume
+            res = sender.resume_transfer()
+            self.assertFalse(res['success'])
+
+            # Set parameters as if transfer was disconnected
+            sender.target_ip = '127.0.0.1'
+            sender.target_port = 52077
+            sender.source_paths = [test_file]
+            sender.status = 'error'
+
+            # Bridge telemetry reflects can_resume = True
+            from backend.bridge import BridgeAPI
+            bridge = BridgeAPI()
+            bridge._transfer = sender
+            telemetry = bridge.get_dashboard_telemetry()
+            self.assertTrue(telemetry['can_resume'])
+
 
 if __name__ == '__main__':
     unittest.main()
