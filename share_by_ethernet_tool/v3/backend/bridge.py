@@ -336,10 +336,14 @@ class BridgeAPI:
         """Resumes an interrupted or disconnected transfer from Home screen."""
         return self._transfer.resume_transfer()
 
-    def configure_ethernet(self) -> Dict[str, Any]:
-        """Triggers native OS privilege elevation popup (Polkit/pkexec or Windows UAC) to auto-configure direct Ethernet."""
+    def get_system_platform(self) -> str:
+        """Returns the host OS platform ('linux', 'win32', or 'darwin')."""
+        return sys.platform
+
+    def configure_ethernet(self, password: str = "") -> Dict[str, Any]:
+        """Auto-configures direct Ethernet with optional password from in-UI modal."""
         from .network_config import configure_direct_ethernet
-        return configure_direct_ethernet()
+        return configure_direct_ethernet(password)
 
     def revert_ethernet(self) -> Dict[str, Any]:
         """Manually or automatically reverts temporary Ethernet IP and firewall settings back to normal."""

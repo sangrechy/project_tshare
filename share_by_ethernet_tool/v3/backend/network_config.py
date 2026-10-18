@@ -1,6 +1,6 @@
 """
 T-Share v3 Network & Firewall Auto-Configuration
-Uses native OS privilege elevation popups (Polkit/pkexec on Linux, UAC on Windows)
+Supports In-UI Password Elevation (sudo -S on Linux/macOS) and Native Windows UAC
 to temporarily assign IP to unconfigured Ethernet and open firewall ports.
 Zero terminal commands needed by the user.
 
@@ -39,11 +39,12 @@ def get_backup_path() -> str:
         return TEMP_BACKUP_FILE
 
 
-def configure_direct_ethernet() -> Dict[str, Any]:
+def configure_direct_ethernet(password: str = "") -> Dict[str, Any]:
     """
-    Triggers native OS authentication dialog (pkexec on Linux, UAC on Windows)
-    to temporarily set up direct Ethernet and open firewall ports.
-    Spawns a watchdog tied to this process PID that restores normal settings on exit.
+    Sets up direct Ethernet IP (192.168.123.x) and opens firewall ports (52000-52010).
+    On Linux/macOS: Uses password from UI with sudo -S.
+    On Windows: Uses native UAC approval.
+    Spawns a background watchdog tied to parent PID that restores normal settings on exit.
     """
     parent_pid = os.getpid()
     backup_path = get_backup_path()
@@ -56,25 +57,20 @@ def configure_direct_ethernet() -> Dict[str, Any]:
             pass
 
     if sys.platform.startswith("linux"):
-        return _configure_linux(parent_pid, backup_path)
+        return _configure_linux(password, parent_pid, backup_path)
     elif sys.platform == "win32":
         return _configure_windows(parent_pid, backup_path)
     elif sys.platform == "darwin":
-        return _configure_macos(parent_pid, backup_path)
+        return _configure_macos(password, parent_pid, backup_path)
     else:
         return {"success": False, "error": "Unsupported platform"}
 
 
-def _configure_linux(parent_pid: int, backup_path: str) -> Dict[str, Any]:
-    if not shutil.which("pkexec") and not shutil.which("sudo"):
-        return {"success": False, "error": "Neither pkexec (Polkit) nor sudo found"}
+def _configure_linux(password: str, parent_pid: int, backup_path: str) -> Dict[str, Any]:
+    is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
+    if not is_root and not shutil.which("sudo") and not shutil.which("pkexec"):
+        return {"success": False, "error": "Neither sudo nor pkexec found on system."}
 
-    # Script executed with root privileges via Polkit popup:
-    # 1. Finds physical ethernet interface
-    # 2. Backs up current IP & NetworkManager state
-    # 3. Adds runtime-only firewall rules (no --permanent!)
-    # 4. Assigns temporary IP 192.168.123.2/24 if unassigned
-    # 5. Spawns background watchdog that reverts everything when parent_pid exits
     trigger_path = TRIGGER_FILE
     bash_script = f'''
 PPID_VAL="{parent_pid}"
@@ -89,7 +85,8 @@ for d in $(ls /sys/class/net 2>/dev/null); do
 done
 
 if [ -z "$ETH" ]; then
-  exit 1
+  echo "No physical Ethernet interface found" >&2
+  exit 2
 fi
 
 EXISTING_IP=$(ip -4 addr show dev "$ETH" 2>/dev/null | grep -o 'inet [0-9.]*' | head -n1 | awk '{{print $2}}')
@@ -103,6 +100,7 @@ cat << EOF > "$BFILE"
   "assigned_ip": "192.168.123.2/24"
 }}
 EOF
+chmod 666 "$BFILE" 2>/dev/null || true
 
 # 1. Temporary runtime firewall rules (no --permanent)
 if command -v firewall-cmd &>/dev/null; then
@@ -118,14 +116,20 @@ if [ -z "$EXISTING_IP" ]; then
   ip link set "$ETH" up 2>/dev/null || true
 fi
 
-# 3. Fork background watchdog process to revert settings when session ends
-(
+# 3. Fork detached background watchdog process as root
+nohup bash -c '
+  PPID_VAL="'"$PPID_VAL"'"
+  ETH="'"$ETH"'"
+  EXISTING_IP="'"$EXISTING_IP"'"
+  BFILE="'"$BFILE"'"
+  TFILE="'"$TFILE"'"
+
   while kill -0 "$PPID_VAL" 2>/dev/null; do
     if [ -f "$TFILE" ]; then break; fi
     sleep 1
   done
 
-  # Revert back to normal
+  # Revert settings
   if [ -z "$EXISTING_IP" ]; then
     ip addr del 192.168.123.2/24 dev "$ETH" 2>/dev/null || true
     if command -v nmcli &>/dev/null; then
@@ -141,18 +145,52 @@ fi
   fi
 
   rm -f "$BFILE" "$TFILE"
-) >/dev/null 2>&1 &
+' >/dev/null 2>&1 &
 '''
 
+    if is_root:
+        cmd = ["bash", "-c", bash_script]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if proc.returncode == 0:
+            return {"success": True, "message": "Direct Ethernet configured successfully."}
+        return {"success": False, "error": proc.stderr.strip() or "Failed to configure interface"}
+
+    if password:
+        # User entered password in UI modal -> Pipe directly to sudo -S -k
+        cmd = ["sudo", "-S", "-k", "bash", "-c", bash_script]
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = proc.communicate(input=password + "\n")
+            if proc.returncode == 0:
+                return {"success": True, "message": "Direct Ethernet configured successfully (192.168.123.2)."}
+
+            lower_err = stderr.lower()
+            if "incorrect password" in lower_err or "try again" in lower_err or "authentication failure" in lower_err:
+                return {"success": False, "error": "Incorrect password. Please try again."}
+            elif "not in the sudoers" in lower_err:
+                return {"success": False, "error": "Current user is not in sudoers list."}
+            return {"success": False, "error": stderr.strip() or "Sudo authentication failed."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # If no password provided, check if passwordless sudo works
     try:
-        if shutil.which("pkexec"):
-            subprocess.Popen(["pkexec", "bash", "-c", bash_script])
-            return {"success": True, "message": "Authentication popup triggered"}
-        else:
-            subprocess.Popen(["sudo", "bash", "-c", bash_script])
-            return {"success": True, "message": "Sudo authentication triggered"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+        check = subprocess.run(["sudo", "-n", "true"], capture_output=True)
+        if check.returncode == 0:
+            proc = subprocess.run(["sudo", "bash", "-c", bash_script], capture_output=True, text=True)
+            if proc.returncode == 0:
+                return {"success": True, "message": "Direct Ethernet configured."}
+            return {"success": False, "error": proc.stderr.strip()}
+    except Exception:
+        pass
+
+    return {"success": False, "error": "Password required", "need_password": True}
 
 
 def _configure_windows(parent_pid: int, backup_path: str) -> Dict[str, Any]:
@@ -217,18 +255,29 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -Command 
     cmd = f'Start-Process powershell -Verb runAs -ArgumentList \'-NoProfile -Command "{ps_script}"\''
     try:
         subprocess.Popen(["powershell", "-NoProfile", "-Command", cmd])
-        return {"success": True, "message": "Windows UAC popup triggered"}
+        return {"success": True, "message": "Windows UAC confirmation triggered."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
-def _configure_macos(parent_pid: int, backup_path: str) -> Dict[str, Any]:
-    applescript = 'do shell script "pfctl -e 2>/dev/null || true" with administrator privileges'
-    try:
-        subprocess.Popen(["osascript", "-e", applescript])
-        return {"success": True, "message": "macOS admin popup triggered"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+def _configure_macos(password: str, parent_pid: int, backup_path: str) -> Dict[str, Any]:
+    if password:
+        cmd = ["sudo", "-S", "-k", "pfctl", "-e"]
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            _, stderr = proc.communicate(input=password + "\n")
+            if proc.returncode == 0:
+                return {"success": True, "message": "macOS network configured."}
+            return {"success": False, "error": "Incorrect password or authorization denied."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    else:
+        applescript = 'do shell script "pfctl -e 2>/dev/null || true" with administrator privileges'
+        try:
+            subprocess.Popen(["osascript", "-e", applescript])
+            return {"success": True, "message": "macOS admin prompt triggered"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
 
 def revert_direct_ethernet() -> Dict[str, Any]:

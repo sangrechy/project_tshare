@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSettingsControls();
   setupEmergencyControls();
   setupResumeControls();
+  setupAuthModalControls();
 
   // Listen for manual IP changes to update target status in real time
   const manualIp = document.getElementById('manualIpInput');
@@ -490,29 +491,11 @@ function setupReceiveControls() {
     });
   }
 
-  // Auto-Setup Ethernet Wire button (native OS elevation popup)
+  // Auto-Setup Ethernet Wire button (in-UI authorization modal)
   const btnSetupEth = document.getElementById('btnSetupEthWire');
   if (btnSetupEth) {
-    btnSetupEth.addEventListener('click', async () => {
-      btnSetupEth.disabled = true;
-      btnSetupEth.textContent = "Requesting Auth...";
-      try {
-        if (window.pywebview) {
-          const res = await window.pywebview.api.configure_ethernet();
-          if (res && res.success) {
-            alert("Temporary direct Ethernet setup initiated!\nApprove the OS authentication dialog (Polkit / UAC) if prompted.\nSettings will automatically revert when you close the app.");
-            setTimeout(loadNetworkPill, 2500);
-            setTimeout(loadNetworkPill, 5000);
-          } else {
-            alert(`Setup error: ${res ? res.error : "Unknown error"}`);
-          }
-        }
-      } catch (err) {
-        alert(`Error: ${err}`);
-      } finally {
-        btnSetupEth.disabled = false;
-        btnSetupEth.textContent = "⚡ Auto-Setup (Popup)";
-      }
+    btnSetupEth.addEventListener('click', () => {
+      openAuthModal();
     });
   }
 
@@ -616,6 +599,159 @@ function setupResumeControls() {
   const btnHeader = document.getElementById('btnResumeTransfer');
   if (btnHome) btnHome.addEventListener('click', doResume);
   if (btnHeader) btnHeader.addEventListener('click', doResume);
+}
+
+// ----------------- IN-UI AUTHORIZATION MODAL -----------------
+
+let cachedPlatform = 'linux';
+
+async function openAuthModal() {
+  const modal = document.getElementById('authModal');
+  const input = document.getElementById('authPasswordInput');
+  const errMsg = document.getElementById('authErrorMessage');
+  const desc = document.getElementById('authModalDesc');
+  const pwdGroup = document.getElementById('authPasswordGroup');
+  const btnConfirmText = document.getElementById('btnConfirmAuthText');
+
+  if (!modal) return;
+
+  // Clear previous state
+  if (input) input.value = '';
+  if (errMsg) {
+    errMsg.textContent = '';
+    errMsg.classList.add('hidden');
+  }
+
+  // Detect OS platform from bridge
+  try {
+    if (window.pywebview && window.pywebview.api.get_system_platform) {
+      cachedPlatform = await window.pywebview.api.get_system_platform();
+    }
+  } catch (e) {
+    cachedPlatform = 'linux';
+  }
+
+  if (cachedPlatform === 'win32') {
+    if (pwdGroup) pwdGroup.classList.add('hidden');
+    if (desc) {
+      desc.innerHTML = 'Windows will request administrator permission (UAC) to temporarily assign direct Ethernet IP (<code>192.168.123.1</code>) and open firewall ports <code>52000–52010</code>.';
+    }
+    if (btnConfirmText) btnConfirmText.textContent = 'Launch Windows UAC';
+  } else {
+    if (pwdGroup) pwdGroup.classList.remove('hidden');
+    if (desc) {
+      desc.innerHTML = 'Enter your system password to temporarily assign direct Ethernet IP (<code>192.168.123.2</code>) and open firewall ports <code>52000–52010</code>.';
+    }
+    if (btnConfirmText) btnConfirmText.textContent = 'Authorize & Configure';
+  }
+
+  modal.classList.remove('hidden');
+  if (cachedPlatform !== 'win32' && input) {
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function closeAuthModal() {
+  const modal = document.getElementById('authModal');
+  const input = document.getElementById('authPasswordInput');
+  const errMsg = document.getElementById('authErrorMessage');
+  if (modal) modal.classList.add('hidden');
+  if (input) input.value = '';
+  if (errMsg) errMsg.classList.add('hidden');
+}
+
+function setupAuthModalControls() {
+  const modal = document.getElementById('authModal');
+  const btnClose = document.getElementById('btnCloseAuthModal');
+  const btnCancel = document.getElementById('btnCancelAuth');
+  const btnConfirm = document.getElementById('btnConfirmAuth');
+  const input = document.getElementById('authPasswordInput');
+  const btnToggleEye = document.getElementById('btnTogglePassword');
+  const errMsg = document.getElementById('authErrorMessage');
+  const btnConfirmText = document.getElementById('btnConfirmAuthText');
+
+  if (btnClose) btnClose.addEventListener('click', closeAuthModal);
+  if (btnCancel) btnCancel.addEventListener('click', closeAuthModal);
+
+  // Close on backdrop click
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeAuthModal();
+    });
+  }
+
+  // Close on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      closeAuthModal();
+    }
+  });
+
+  // Toggle eye visibility
+  if (btnToggleEye && input) {
+    btnToggleEye.addEventListener('click', () => {
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+  }
+
+  // Submit on Enter key inside password input
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (btnConfirm) btnConfirm.click();
+      }
+    });
+  }
+
+  // Confirm authorization
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', async () => {
+      const pwd = input ? input.value : '';
+
+      if (cachedPlatform !== 'win32' && !pwd) {
+        if (errMsg) {
+          errMsg.textContent = 'Please enter your password.';
+          errMsg.classList.remove('hidden');
+        }
+        if (input) input.focus();
+        return;
+      }
+
+      if (errMsg) errMsg.classList.add('hidden');
+      btnConfirm.disabled = true;
+      const origText = btnConfirmText ? btnConfirmText.textContent : 'Authorize & Configure';
+      if (btnConfirmText) btnConfirmText.textContent = 'Configuring Ethernet...';
+
+      try {
+        if (window.pywebview) {
+          const res = await window.pywebview.api.configure_ethernet(pwd);
+          if (res && res.success) {
+            closeAuthModal();
+            alert(`Direct Ethernet configured!\n${res.message || 'Wire IP assigned.'}\nSettings will automatically revert when you close the app.`);
+            loadNetworkPill();
+            setTimeout(loadNetworkPill, 2000);
+          } else {
+            if (errMsg) {
+              errMsg.textContent = res ? (res.error || 'Authorization failed') : 'Unknown error';
+              errMsg.classList.remove('hidden');
+            }
+            if (input) {
+              input.select();
+              input.focus();
+            }
+          }
+        }
+      } catch (err) {
+        if (errMsg) {
+          errMsg.textContent = `Error: ${err}`;
+          errMsg.classList.remove('hidden');
+        }
+      } finally {
+        btnConfirm.disabled = false;
+        if (btnConfirmText) btnConfirmText.textContent = origText;
+      }
+    });
+  }
 }
 
 function showIncomingOffer(offer) {
