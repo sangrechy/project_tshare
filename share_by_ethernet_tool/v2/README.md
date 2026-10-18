@@ -23,11 +23,11 @@ A unified, high-performance **Dark Neumorphic & Glassmorphic Desktop Application
 Each launcher automatically checks dependencies, self-installs any missing Python packages via `pip`, verifies system utilities (Robocopy on Windows, rsync on Linux/macOS), and launches the Cockpit.
 
 ### 🪟 Windows:
-* **Double-click:** [`run.bat`](file:///e:/projects/project_tshare/share_by_ethernet_tool/v2/run.bat) (or `run_win.bat`)
+* **Double-click:** [`run_win.bat`](file:///e:/projects/project_tshare/share_by_ethernet_tool/v2/run_win.bat)
 * **Terminal:**
   ```powershell
   cd share_by_ethernet_tool\v2
-  run.bat
+  .\run_win.bat
   ```
 
 ### 🐧 Linux:
@@ -46,11 +46,6 @@ Each launcher automatically checks dependencies, self-installs any missing Pytho
   chmod +x run_mac.sh
   ./run_mac.sh
   ```
-
-### 🌐 Universal POSIX (Linux / macOS):
-```bash
-./run.sh
-```
 
 ### ⚡ Launch with Pre-Configured Source & Target Paths:
 ```bash
