@@ -1,0 +1,224 @@
+"""
+T-Share Hardware Telemetry & Network Detector
+Collects hardware metrics to drive live gauges, resource governor sliders, and network adapters.
+"""
+
+import os
+import socket
+import shutil
+import ipaddress
+import psutil
+from typing import Dict, List, Any, Tuple
+
+
+def get_network_interfaces() -> List[Dict[str, Any]]:
+    """Enumerate network interfaces, detecting link-local Ethernet and LAN IPs."""
+    interfaces = []
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+
+        for name, addr_list in addrs.items():
+            stat = stats.get(name)
+            is_up = stat.isup if stat else True
+            speed_mbps = stat.speed if stat and stat.speed > 0 else 1000
+
+            for addr in addr_list:
+                if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                    ip = addr.address
+                    is_link_local = ip.startswith("169.254.")
+                    is_direct_wire = ip.startswith("192.168.123.")
+
+                    lname = name.lower()
+                    is_wifi = any(w in lname for w in ["wl", "wi-fi", "wifi", "wireless", "802.11"])
+                    is_ethernet = any(k in lname for k in ["eth", "en", "ethernet", "lan", "realtek", "intel", "asix"]) and not is_wifi
+
+                    priority = 0 if is_direct_wire else (1 if (is_link_local and is_ethernet) else (2 if is_ethernet else 3))
+
+                    interfaces.append({
+                        "name": name,
+                        "ip": ip,
+                        "netmask": addr.netmask,
+                        "is_up": is_up,
+                        "speed_mbps": speed_mbps,
+                        "is_link_local": is_link_local,
+                        "is_direct_wire": is_direct_wire,
+                        "is_ethernet": is_ethernet,
+                        "is_wifi": is_wifi,
+                        "priority": priority
+                    })
+    except Exception:
+        pass
+
+    interfaces.sort(key=lambda x: x["priority"])
+    return interfaces
+
+
+def get_detailed_network_info() -> Dict[str, Any]:
+    """Returns categorized Wi-Fi and Ethernet connection modules."""
+    wifi_entry = None
+    eth_entry = None
+
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+
+        for name, addr_list in addrs.items():
+            stat = stats.get(name)
+            is_up = stat.isup if stat else True
+            speed_mbps = stat.speed if stat and stat.speed > 0 else 1000
+
+            lname = name.lower()
+            is_wifi = any(w in lname for w in ["wl", "wi-fi", "wifi", "wireless", "802.11"])
+            is_eth = any(e in lname for e in ["eth", "en", "ethernet", "lan", "realtek", "intel", "asix"]) and not is_wifi
+
+            ipv4 = ""
+            for addr in addr_list:
+                if addr.family == socket.AF_INET and not addr.address.startswith("127."):
+                    if addr.address.startswith("192.168.123."):
+                        ipv4 = addr.address
+                        break
+                    elif not ipv4:
+                        ipv4 = addr.address
+
+            is_direct_wire_ip = bool(ipv4 and (ipv4.startswith("192.168.123.") or ipv4.startswith("169.254.")))
+            has_ip = bool(ipv4) if is_wifi else is_direct_wire_ip
+
+            info = {
+                "name": name,
+                "ip": ipv4,
+                "is_up": is_up,
+                "speed_mbps": speed_mbps,
+                "has_ip": has_ip,
+                "display": ipv4 if ipv4 else "Unconfigured"
+            }
+
+            if is_wifi and not wifi_entry:
+                wifi_entry = info
+            elif is_eth and not eth_entry:
+                eth_entry = info
+    except Exception:
+        pass
+
+    return {
+        "wifi": wifi_entry,
+        "ethernet": eth_entry
+    }
+
+
+def get_detailed_adapters() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
+    """
+    Returns (eth_list, wifi_list, broadcast_addrs)
+    - eth_list: physical Ethernet adapters with IP, MAC, IPv6 link-local, status, speed.
+    - wifi_list: Wi-Fi adapters with IP, MAC, IPv6 link-local, status, speed.
+    - broadcast_addrs: all subnet broadcast addresses.
+    """
+    eth_list = []
+    wifi_list = []
+    bcasts = set(["255.255.255.255", "192.168.123.255", "169.254.255.255", "192.168.123.1", "192.168.123.2"])
+
+    try:
+        addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
+
+        for name, addr_list in addrs.items():
+            lname = name.lower()
+            stat = stats.get(name)
+            is_up = stat.isup if stat else True
+            speed = stat.speed if stat and stat.speed > 0 else 1000
+
+            is_wifi = any(w in lname for w in ["wl", "wi-fi", "wifi", "wireless", "802.11"])
+            is_eth = any(e in lname for e in ["eth", "en", "ethernet", "lan", "realtek", "intel", "asix"]) and not is_wifi
+
+            ipv4 = ""
+            ipv6_ll = ""
+            mac = ""
+
+            for a in addr_list:
+                if a.family == socket.AF_INET and not a.address.startswith("127."):
+                    if a.address.startswith("192.168.123."):
+                        ipv4 = a.address
+                    elif not ipv4:
+                        ipv4 = a.address
+
+                    if a.netmask:
+                        try:
+                            net = ipaddress.IPv4Network(f"{a.address}/{a.netmask}", strict=False)
+                            bcasts.add(str(net.broadcast_address))
+                        except Exception:
+                            pass
+                elif a.family == socket.AF_INET6:
+                    if a.address.startswith("fe80:"):
+                        ipv6_ll = a.address.split("%")[0]
+                elif a.family == getattr(psutil, "AF_LINK", -1):
+                    mac = a.address
+
+            info = {
+                "name": name,
+                "ip": ipv4,
+                "mac": mac,
+                "ipv6_ll": ipv6_ll,
+                "is_up": is_up,
+                "speed_mbps": speed
+            }
+
+            if is_eth:
+                eth_list.append(info)
+            elif is_wifi:
+                wifi_list.append(info)
+    except Exception:
+        pass
+
+    eth_list.sort(key=lambda x: (
+        0 if x["ip"].startswith("192.168.123.") else (
+        1 if x["ip"].startswith("169.254.") else (
+        2 if bool(x["ip"]) else 3
+    ))))
+
+    return eth_list, wifi_list, list(bcasts)
+
+
+def get_disk_space(path: str = ".") -> Dict[str, Any]:
+    """Returns free and total disk space in bytes for the volume containing path."""
+    try:
+        abs_path = os.path.abspath(path)
+        if not os.path.exists(abs_path):
+            abs_path = os.path.dirname(abs_path) or "."
+        total, used, free = shutil.disk_usage(abs_path)
+        return {
+            "total_bytes": total,
+            "used_bytes": used,
+            "free_bytes": free,
+            "free_gb": round(free / (1024 ** 3), 2),
+            "percent_used": round((used / total) * 100, 1)
+        }
+    except Exception:
+        return {"total_bytes": 0, "used_bytes": 0, "free_bytes": 0, "free_gb": 0, "percent_used": 0}
+
+
+def get_hardware_telemetry(disk_path: str = ".") -> Dict[str, Any]:
+    """Comprehensive hardware snapshot for Home tab and Settings sliders."""
+    ram = psutil.virtual_memory()
+    cpu_percent = psutil.cpu_percent(interval=None)
+    cpu_cores = psutil.cpu_count(logical=True) or 4
+    disk = get_disk_space(disk_path)
+    interfaces = get_network_interfaces()
+
+    return {
+        "cpu": {
+            "percent": cpu_percent,
+            "cores": cpu_cores
+        },
+        "ram": {
+            "total_bytes": ram.total,
+            "available_bytes": ram.available,
+            "total_gb": round(ram.total / (1024 ** 3), 1),
+            "available_gb": round(ram.available / (1024 ** 3), 1),
+            "percent_used": ram.percent
+        },
+        "disk": disk,
+        "network": {
+            "primary_ip": interfaces[0]["ip"] if interfaces else "127.0.0.1",
+            "interfaces": interfaces
+        }
+    }

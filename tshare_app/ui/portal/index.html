@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>T-Share LAN Web Portal</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <div class="portal-container">
+    <header class="portal-header">
+      <div class="header-brand">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1 class="portal-title">T-SHARE <span class="badge">LAN Portal</span></h1>
+          <p class="portal-sub" id="portalHostInfo">Connecting to host...</p>
+        </div>
+      </div>
+      <div class="portal-nav">
+        <button class="p-nav-btn active" id="tabBtnBrowse">📁 Browse & Download</button>
+        <button class="p-nav-btn" id="tabBtnUpload">📤 Upload to PC</button>
+      </div>
+    </header>
+
+    <!-- SECTION 1: BROWSE & DOWNLOAD -->
+    <main id="viewBrowse" class="portal-view active">
+      <div class="search-bar-wrap">
+        <input type="text" id="searchInput" placeholder="Search files in current folder..." autocomplete="off">
+      </div>
+
+      <div class="breadcrumb-bar" id="breadcrumbBar">
+        <span class="crumb active" data-path="">Home</span>
+      </div>
+
+      <div class="file-list-card">
+        <div class="list-header">
+          <span>Name</span>
+          <span>Size</span>
+        </div>
+        <ul class="file-list" id="fileList">
+          <li class="loading-item">Loading files...</li>
+        </ul>
+      </div>
+    </main>
+
+    <!-- SECTION 2: UPLOAD TO HOST PC -->
+    <main id="viewUpload" class="portal-view">
+      <div class="upload-card">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📤</div>
+          <h3>Select or Drop Files to Upload</h3>
+          <p>Files will be safely transferred to the host computer</p>
+          <input type="file" id="fileInput" multiple style="display: none;">
+          <button type="button" class="btn-browse" onclick="document.getElementById('fileInput').click()">Choose Files</button>
+        </div>
+
+        <div id="uploadProgressWrap" class="progress-wrap hidden">
+          <div class="prog-label">
+            <span id="uploadStatusText">Uploading...</span>
+            <span id="uploadPctText">0%</span>
+          </div>
+          <div class="prog-track">
+            <div class="prog-fill" id="uploadBar" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div id="uploadResults" class="upload-results hidden">
+          <h4>Uploaded Files:</h4>
+          <ul id="uploadedItemsList"></ul>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="portal.js"></script>
+</body>
+</html>
