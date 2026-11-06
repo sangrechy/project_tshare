@@ -44,13 +44,15 @@ class FileSharingView extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 32,
+          runSpacing: 32,
           children: [
             // Left: The Rotary Dial
-            Expanded(
-              flex: 5,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 450),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -81,13 +83,9 @@ class FileSharingView extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(width: 32),
-
             // Right: Mirrored Selection Summary Boxes
-            Expanded(
-              flex: 4,
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 380),
+            Container(
+              constraints: const BoxConstraints(maxWidth: 380),
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: const Color(0xFF111827),
@@ -176,7 +174,6 @@ class FileSharingView extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
           ],
         ),
       ),

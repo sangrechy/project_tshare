@@ -81,93 +81,107 @@ class _TShareShellState extends State<TShareShell> {
                 // ====================================================
                 // 1. FIXED TOP NAVIGATION BAR
                 // ====================================================
-                Container(
-                  height: 64,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0F172A),
-                    border: Border(
-                      bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5),
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      // Branding & Logo
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
-                          ),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'TSHARE',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2.0,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(width: 48),
-
-                      // Fixed 5 Top Menus
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(_navItems.length, (index) {
-                            final item = _navItems[index];
-                            final isSelected = _appVm.currentNavIndex == index;
-
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: InkWell(
-                                onTap: () => _appVm.setNavIndex(index),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF0284C7).withAlpha(40) : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: isSelected
-                                        ? Border.all(color: const Color(0xFF38BDF8), width: 1.5)
-                                        : null,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        item['icon'] as IconData,
-                                        size: 16,
-                                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        item['label'] as String,
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                                          color: isSelected ? Colors.white : const Color(0xFF94A3B8),
-                                          letterSpacing: 1.0,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isMobile = constraints.maxWidth < 768;
+                    return Container(
+                      height: 64,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0F172A),
+                        border: Border(
+                          bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5),
                         ),
                       ),
+                      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
+                      child: Row(
+                        children: [
+                          // Branding & Logo
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                              ),
+                              if (!isMobile) ...[
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'TSHARE',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2.0,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+
+                          SizedBox(width: isMobile ? 12 : 36),
+
+                          // Fixed 5 Top Menus (Scrollable on small screens)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: List.generate(_navItems.length, (index) {
+                                  final item = _navItems[index];
+                                  final isSelected = _appVm.currentNavIndex == index;
+
+                                  return Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8),
+                                    child: InkWell(
+                                      onTap: () => _appVm.setNavIndex(index),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: isMobile ? 10 : 16,
+                                          vertical: isMobile ? 8 : 10,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? const Color(0xFF0284C7).withAlpha(40) : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: isSelected
+                                              ? Border.all(color: const Color(0xFF38BDF8), width: 1.5)
+                                              : null,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              item['icon'] as IconData,
+                                              size: 16,
+                                              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              item['label'] as String,
+                                              style: TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                                                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                                                letterSpacing: 1.0,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                          ),
+
+                          if (!isMobile) const SizedBox(width: 16),
 
                       // Right Status Badge
                       Container(
@@ -205,7 +219,9 @@ class _TShareShellState extends State<TShareShell> {
                       ),
                     ],
                   ),
-                ),
+                );
+              },
+            ),
 
                 // ====================================================
                 // 2. ACTIVE PAGE CONTENT
