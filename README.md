@@ -4,9 +4,29 @@ A unified suite of file-sharing and transfer tools providing web-based portals, 
 
 ---
 
-## 🚀 Flagship Unified App: `tshare_app/` (Recommended)
+## 📱 Cross-Platform Flutter App: `tshare_flutter/` (Linux, Windows, macOS, Android)
 
-The **`tshare_app`** folder unites all three tools into a single, cohesive desktop & web application with zero Node.js/npm dependencies:
+The **`tshare_flutter`** folder provides the complete, production-grade Flutter desktop and mobile application implementing the official TShare specification:
+
+* **Fixed 5-Navigation Top Bar:** Instant switching between `HOME`, `FILE SHARING`, `FILE SERVER`, `VERIFY`, and `SETTINGS`.
+* **Single-Page 3-State Rotary File Sharing:**
+  * **State 1 (Rotary Telephone Dial):** Interactive animated rotating outer ring with fixed stationary labels (`SEND`, `RECEIVE`, `WiFi`, `BLE`, `Ethernet`) and central `SELECT`.
+  * **State 2 (Device Connection):** Seamless transition into Manual Connect and UDP multicast Auto Find Devices.
+  * **State 3 (Transfer Dashboard):** Real-time dual circular speed & CPU gauges, block progress bar, live terminal logs, in-flight checksum validation, pause/resume.
+* **Embedded LAN File Server:** Built-in HTTP portal on port 52003 with dynamic QR code generation for instant mobile browsing, downloading, and uploading.
+* **Pairwise SHA-256 Audit (`VERIFY`):** Chunked bit-for-bit cryptographic verification with instant match/mismatch verdict.
+* **Settings & Diagnostics:** Persistent download directory, CRC32/SHA-256/Turbo integrity selector, bandwidth governor, and hardware diagnostics.
+
+```bash
+cd tshare_flutter
+flutter run -d linux    # or windows / macos / android
+```
+
+---
+
+## 🚀 Unified Python App: `tshare_app/`
+
+The **`tshare_app`** folder unites the desktop and web portal in Python:
 
 * **Direct Cable (P2P Wire Engine):** Pure raw TCP socket streaming at 60–100+ MB/s line-rate with 4 MB aligned blocks, Wi-Fi assisted wire-locking, and automatic PID-bound network configuration rollback.
 * **In-Flight Integrity Toggle:** Choose between `CRC32 Fast Stream` (~1% CPU), `SHA-256 Cryptographic`, or `Disabled / Turbo Raw` (Max wire speed).
@@ -31,13 +51,14 @@ cd tshare_app && python3 app.py --web
 
 ---
 
-## 🧰 Individual Sub-Tools Overview
+## 🧰 Sub-Tools Overview
 
-The repository also retains the individual baseline tools for standalone reference:
+The repository provides the following implementations:
 
 | Tool | Core Technology | Primary Use Case |
 | :--- | :--- | :--- |
-| [**`tshare_app/`**](tshare_app/) | Python 3, PyWebView, Raw Sockets, SQLite | **Flagship Unified Application** uniting direct wire transfers, mobile web portal, and dynamic SHA/CRC32 verification. |
+| [**`tshare_flutter/`**](tshare_flutter/) | Dart, Flutter (Cross-platform) | **Full Cross-Platform App** (Linux, Windows, macOS, Android) with rotary telephone dial, embedded LAN server, and SHA-256 audit. |
+| [**`tshare_app/`**](tshare_app/) | Python 3, PyWebView, Raw Sockets, SQLite | **Desktop & Web Suite** uniting direct wire transfers, mobile web portal, and dynamic SHA/CRC32 verification. |
 | [**`share_by_web_tool/`**](share_by_web_tool/) | Node.js, Express, Multer | Browser-based file sharing portal for uploading, downloading, and managing files across devices. |
 | [**`file_server_tool/`**](file_server_tool/) | Node.js, Express | Lightweight read-only LAN file server with automatic IP detection and folder navigation. |
 | [**`share_by_ethernet_tool/`**](share_by_ethernet_tool/) | Python, PyWebView, Sockets | High-speed direct Ethernet / LAN sync with kernel I/O telemetry, safe resume, and multi-level verification. |
