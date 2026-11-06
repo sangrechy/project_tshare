@@ -1,96 +1,143 @@
 import 'package:flutter/material.dart';
 
+/// Strict Black & White Monochrome Design System
+/// Derived from project_dev_android_widgets UI theme
 class AppTheme {
-  static const Color bgMain = Color(0xFF0B0F19);
-  static const Color bgCard = Color(0xFF111827);
-  static const Color bgCardHover = Color(0xFF1F2937);
-  static const Color bgCardBorder = Color(0xFF1E293B);
+  // =============================================================================
+  // UI Theme: Strict Black & White Monochrome (No light or glowing colors)
+  // =============================================================================
+  static const Color themeBgTop = Color(0xFF000000);
+  static const Color themeBgMid = Color(0xFF080808);
+  static const Color themeBgBottom = Color(0xFF040404);
+  static const Color themeBgDark = Color(0xFF000000);
 
-  static const Color primary = Color(0xFF3B82F6);
-  static const Color primaryHover = Color(0xFF2563EB);
-  static const Color primaryGlow = Color(0x663B82F6);
+  static const Color themeCardBg = Color(0xF2101010);
+  static const Color themeCardBgElevated = Color(0xF6161616);
+  static const Color themeCardBorder = Color(0x28FFFFFF); // 16% crisp white border
 
-  static const Color success = Color(0xFF10B981);
-  static const Color successGlow = Color(0x5510B981);
+  static const Color themeInnerBoxBg = Color(0xFF0C0C0C);
+  static const Color themeInnerBoxBorder = Color(0x20FFFFFF);
 
-  static const Color danger = Color(0xFFEF4444);
-  static const Color dangerGlow = Color(0x55EF4444);
+  static const Color themeTextFieldBg = Color(0xFF121212);
+  static const Color themeTextFieldBorder = Color(0xFF2C2C2C);
+  static const Color themeTextEditorBg = Color(0xFF080808);
+  static const Color themeCodeBlockBg = Color(0xFF050505);
 
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color cyan = Color(0xFF06B6D4);
-  static const Color cyanGlow = Color(0x6606B6D4);
-  static const Color purple = Color(0xFF8B5CF6);
+  static const Color themeTopBarBg = Color(0xF2080808);
+  static const Color themeTopBarBorder = Color(0x20FFFFFF);
 
-  static const Color textMain = Color(0xFFF3F4F6);
-  static const Color textMuted = Color(0xFF9CA3AF);
-  static const Color textDim = Color(0xFF64748B);
+  static const Color themeDrawerBg = Color(0xFA080808);
+  static const Color themeDrawerHeaderBg = Color(0xFF141414);
+  static const Color themeDrawerItemSelected = Color(0x26FFFFFF);
+
+  static const Color themePillBg = Color(0xFF181818);
+  static const Color themePillBorder = Color(0x26FFFFFF);
+
+  static const Color themeTextPrimary = Color(0xFFFFFFFF);
+  static const Color themeTextSecondary = Color(0xFFAAAAAA);
+  static const Color themeTextMuted = Color(0xFF707070);
+
+  static const Color themeAccentPrimary = Color(0xFFFFFFFF);  // Pure White
+  static const Color themeAccentSilver = Color(0xFFD4D4D4);   // Crisp Silver
+  static const Color themeAccentMedium = Color(0xFFA3A3A3);   // Medium Silver
+  static const Color themeAccentMuted = Color(0xFF737373);    // Charcoal Gray
+
+  // Compatibility aliases
+  static const Color bgMain = themeBgDark;
+  static const Color bgCard = themeCardBg;
+  static const Color bgCardHover = themeCardBgElevated;
+  static const Color bgCardBorder = themeCardBorder;
+
+  static const Color primary = themeAccentPrimary;
+  static const Color primaryHover = themeAccentSilver;
+  static const Color primaryGlow = Colors.transparent;
+
+  static const Color success = themeAccentSilver;
+  static const Color successGlow = Colors.transparent;
+
+  static const Color danger = Color(0xFFB0B0B0);
+  static const Color dangerGlow = Colors.transparent;
+
+  static const Color warning = themeAccentMedium;
+  static const Color cyan = themeAccentSilver;
+  static const Color cyanGlow = Colors.transparent;
+  static const Color purple = themeAccentMuted;
+
+  static const Color textMain = themeTextPrimary;
+  static const Color textDim = themeTextMuted;
 
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: bgMain,
+      scaffoldBackgroundColor: themeBgDark,
+      canvasColor: themeBgDark,
       colorScheme: const ColorScheme.dark(
-        primary: primary,
-        secondary: cyan,
-        surface: bgCard,
-        error: danger,
+        primary: themeAccentPrimary,
+        primaryContainer: themeCardBgElevated,
+        secondary: themeAccentSilver,
+        surface: themeCardBg,
+        surfaceContainerHighest: themeInnerBoxBg,
+        onSurface: themeTextPrimary,
+        onPrimary: Color(0xFF000000),
+        outline: themeCardBorder,
       ),
       cardTheme: CardThemeData(
-        color: bgCard,
+        color: themeCardBg,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: bgCardBorder, width: 1),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: themeCardBorder, width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
-          foregroundColor: Colors.white,
+          backgroundColor: themeAccentPrimary,
+          foregroundColor: const Color(0xFF000000),
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           textStyle: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: textMain,
-          side: const BorderSide(color: bgCardBorder),
+          foregroundColor: themeTextPrimary,
+          side: const BorderSide(color: themeCardBorder),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
           ),
           textStyle: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: const Color(0xFF090D16),
+        fillColor: themeTextFieldBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: bgCardBorder),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: themeTextFieldBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: bgCardBorder),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: themeTextFieldBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: primary, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: themeAccentPrimary, width: 1.5),
         ),
-        hintStyle: const TextStyle(color: textDim, fontSize: 13),
+        hintStyle: const TextStyle(color: themeTextMuted, fontSize: 13),
+        labelStyle: const TextStyle(color: themeTextSecondary, fontSize: 13),
       ),
-      fontFamily: '-apple-system',
     );
   }
 }

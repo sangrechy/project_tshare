@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 import '../viewmodels/app_viewmodel.dart';
 import '../viewmodels/sharing_viewmodel.dart';
 import '../widgets/circular_telemetry_gauge.dart';
@@ -23,15 +24,11 @@ class HomeView extends StatelessWidget {
         final isMobile = constraints.maxWidth < 768;
 
         final welcomeCard = Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: AppTheme.themeCardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF334155)),
+            border: Border.all(color: AppTheme.themeCardBorder),
           ),
           child: isMobile
               ? Column(
@@ -42,16 +39,17 @@ class HomeView extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0284C7).withAlpha(40),
+                            color: AppTheme.themeCardBgElevated,
                             shape: BoxShape.circle,
+                            border: Border.all(color: AppTheme.themeCardBorder),
                           ),
-                          child: const Icon(Icons.swap_horizontal_circle_outlined, color: Color(0xFF38BDF8), size: 24),
+                          child: const Icon(Icons.swap_horizontal_circle_outlined, color: AppTheme.themeTextPrimary, size: 22),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
                             'TShare File Transfer',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.themeTextPrimary),
                           ),
                         ),
                       ],
@@ -60,19 +58,20 @@ class HomeView extends StatelessWidget {
                     Text(
                       sharingVm.isTransferring
                           ? 'Transfer in progress with ${sharingVm.peerName} (${sharingVm.currentFileName})'
-                          : 'Cross-platform streaming engine ready over WiFi, BLE & Ethernet.',
-                      style: const TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                          : 'High-speed streaming engine ready over WiFi, BLE & Ethernet.',
+                      style: const TextStyle(fontSize: 12.5, color: AppTheme.themeTextSecondary),
                     ),
                     const SizedBox(height: 14),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: () => appVm.setNavIndex(1),
-                        icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                         label: const Text('FILE SHARING'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: AppTheme.themeAccentPrimary,
+                          foregroundColor: const Color(0xFF000000),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
                         ),
                       ),
                     ),
@@ -83,10 +82,11 @@ class HomeView extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7).withAlpha(40),
+                        color: AppTheme.themeCardBgElevated,
                         shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.themeCardBorder),
                       ),
-                      child: const Icon(Icons.swap_horizontal_circle_outlined, color: Color(0xFF38BDF8), size: 32),
+                      child: const Icon(Icons.swap_horizontal_circle_outlined, color: AppTheme.themeTextPrimary, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -94,25 +94,26 @@ class HomeView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'TShare High-Speed File Transfer',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
+                            'TShare File Transfer Suite',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.themeTextPrimary),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             sharingVm.isTransferring
                                 ? 'Transfer in progress with ${sharingVm.peerName} (${sharingVm.currentFileName})'
-                                : 'Cross-platform streaming engine ready over WiFi, BLE & Ethernet.',
-                            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                                : 'High-speed streaming engine ready over WiFi, BLE & Ethernet.',
+                            style: const TextStyle(fontSize: 13, color: AppTheme.themeTextSecondary),
                           ),
                         ],
                       ),
                     ),
                     ElevatedButton.icon(
                       onPressed: () => appVm.setNavIndex(1),
-                      icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                       label: const Text('FILE SHARING'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
+                        backgroundColor: AppTheme.themeAccentPrimary,
+                        foregroundColor: const Color(0xFF000000),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       ),
                     ),
@@ -121,11 +122,11 @@ class HomeView extends StatelessWidget {
         );
 
         final gaugesCard = Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
+            color: AppTheme.themeCardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF1E293B)),
+            border: Border.all(color: AppTheme.themeCardBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +136,7 @@ class HomeView extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF94A3B8),
+                  color: AppTheme.themeTextSecondary,
                   letterSpacing: 1.0,
                 ),
               ),
@@ -148,14 +149,14 @@ class HomeView extends StatelessWidget {
                     maxValue: 200,
                     label: 'Speed',
                     unit: 'MB/s',
-                    primaryColor: const Color(0xFF38BDF8),
+                    primaryColor: AppTheme.themeAccentPrimary,
                   ),
                   CircularTelemetryGauge(
                     value: sharingVm.currentCpuPercent,
                     maxValue: 100,
                     label: 'CPU',
                     unit: '%',
-                    primaryColor: const Color(0xFF10B981),
+                    primaryColor: AppTheme.themeAccentSilver,
                   ),
                 ],
               ),
@@ -168,6 +169,7 @@ class HomeView extends StatelessWidget {
                 rightLabel: sharingVm.isTransferring
                     ? '${(sharingVm.transferredBytes / (1024 * 1024)).toStringAsFixed(1)} / ${(sharingVm.totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB'
                     : '0 MB',
+                primaryColor: AppTheme.themeAccentPrimary,
               ),
             ],
           ),
@@ -181,28 +183,28 @@ class HomeView extends StatelessWidget {
         final downloadCard = Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFF111827),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF1E293B)),
+            color: AppTheme.themeCardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.themeCardBorder),
           ),
           child: isMobile
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       children: [
-                        const Icon(Icons.folder_open_rounded, color: Color(0xFF38BDF8), size: 20),
-                        const SizedBox(width: 10),
-                        const Text(
+                        Icon(Icons.folder_open_rounded, color: AppTheme.themeTextPrimary, size: 20),
+                        SizedBox(width: 10),
+                        Text(
                           'DOWNLOAD DIRECTORY',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.themeTextSecondary),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       appVm.downloadDirectory,
-                      style: const TextStyle(fontSize: 12, color: Colors.white, fontFamily: 'monospace'),
+                      style: const TextStyle(fontSize: 12, color: AppTheme.themeTextPrimary, fontFamily: 'monospace'),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 10),
@@ -218,8 +220,8 @@ class HomeView extends StatelessWidget {
                         icon: const Icon(Icons.edit_location_alt_outlined, size: 16),
                         label: const Text('CHANGE FOLDER'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF38BDF8),
-                          side: const BorderSide(color: Color(0xFF0284C7)),
+                          foregroundColor: AppTheme.themeTextPrimary,
+                          side: const BorderSide(color: AppTheme.themeCardBorder),
                         ),
                       ),
                     ),
@@ -227,7 +229,7 @@ class HomeView extends StatelessWidget {
                 )
               : Row(
                   children: [
-                    const Icon(Icons.folder_open_rounded, color: Color(0xFF38BDF8), size: 22),
+                    const Icon(Icons.folder_open_rounded, color: AppTheme.themeTextPrimary, size: 22),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -235,12 +237,12 @@ class HomeView extends StatelessWidget {
                         children: [
                           const Text(
                             'DEFAULT DOWNLOAD DIRECTORY',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.themeTextSecondary),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             appVm.downloadDirectory,
-                            style: const TextStyle(fontSize: 13, color: Colors.white, fontFamily: 'monospace'),
+                            style: const TextStyle(fontSize: 13, color: AppTheme.themeTextPrimary, fontFamily: 'monospace'),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ],
@@ -256,8 +258,8 @@ class HomeView extends StatelessWidget {
                       icon: const Icon(Icons.edit_location_alt_outlined, size: 16),
                       label: const Text('CHANGE FOLDER'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF38BDF8),
-                        side: const BorderSide(color: Color(0xFF0284C7)),
+                        foregroundColor: AppTheme.themeTextPrimary,
+                        side: const BorderSide(color: AppTheme.themeCardBorder),
                       ),
                     ),
                   ],

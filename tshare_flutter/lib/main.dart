@@ -87,9 +87,9 @@ class _TShareShellState extends State<TShareShell> {
                     return Container(
                       height: 64,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF0F172A),
+                        color: AppTheme.themeTopBarBg,
                         border: Border(
-                          bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5),
+                          bottom: BorderSide(color: AppTheme.themeTopBarBorder, width: 1),
                         ),
                       ),
                       padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 24),
@@ -101,12 +101,11 @@ class _TShareShellState extends State<TShareShell> {
                               Container(
                                 padding: const EdgeInsets.all(7),
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
-                                  ),
+                                  color: AppTheme.themeCardBgElevated,
                                   borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.themeCardBorder),
                                 ),
-                                child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 20),
+                                child: const Icon(Icons.bolt_rounded, color: AppTheme.themeTextPrimary, size: 20),
                               ),
                               if (!isMobile) ...[
                                 const SizedBox(width: 10),
@@ -116,7 +115,7 @@ class _TShareShellState extends State<TShareShell> {
                                     fontSize: 18,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 2.0,
-                                    color: Colors.white,
+                                    color: AppTheme.themeTextPrimary,
                                   ),
                                 ),
                               ],
@@ -147,10 +146,10 @@ class _TShareShellState extends State<TShareShell> {
                                           vertical: isMobile ? 8 : 10,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: isSelected ? const Color(0xFF0284C7).withAlpha(40) : Colors.transparent,
+                                          color: isSelected ? AppTheme.themeCardBgElevated : Colors.transparent,
                                           borderRadius: BorderRadius.circular(8),
                                           border: isSelected
-                                              ? Border.all(color: const Color(0xFF38BDF8), width: 1.5)
+                                              ? Border.all(color: AppTheme.themeCardBorder, width: 1)
                                               : null,
                                         ),
                                         child: Row(
@@ -159,15 +158,15 @@ class _TShareShellState extends State<TShareShell> {
                                             Icon(
                                               item['icon'] as IconData,
                                               size: 16,
-                                              color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8),
+                                              color: isSelected ? AppTheme.themeTextPrimary : AppTheme.themeTextSecondary,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               item['label'] as String,
                                               style: TextStyle(
                                                 fontSize: 12.5,
-                                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                                                color: isSelected ? Colors.white : const Color(0xFF94A3B8),
+                                                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                                                color: isSelected ? AppTheme.themeTextPrimary : AppTheme.themeTextSecondary,
                                                 letterSpacing: 1.0,
                                               ),
                                             ),
@@ -183,45 +182,43 @@ class _TShareShellState extends State<TShareShell> {
 
                           if (!isMobile) const SizedBox(width: 16),
 
-                      // Right Status Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (_sharingVm.isTransferring ? const Color(0xFF10B981) : const Color(0xFF1E293B)).withAlpha(40),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _sharingVm.isTransferring ? const Color(0xFF10B981) : const Color(0xFF334155),
+                          // Right Status Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.themePillBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: AppTheme.themePillBorder),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _sharingVm.isTransferring ? AppTheme.themeTextPrimary : AppTheme.themeTextSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _sharingVm.isTransferring ? 'STREAMING' : 'READY',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                    color: _sharingVm.isTransferring ? AppTheme.themeTextPrimary : AppTheme.themeTextSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _sharingVm.isTransferring ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _sharingVm.isTransferring ? 'STREAMING' : 'READY',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
-                                color: _sharingVm.isTransferring ? const Color(0xFF10B981) : const Color(0xFF38BDF8),
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
 
                 // ====================================================
                 // 2. ACTIVE PAGE CONTENT

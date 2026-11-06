@@ -13,7 +13,7 @@ class CustomProgressBar extends StatelessWidget {
     this.height = 10,
     this.leftLabel,
     this.rightLabel,
-    this.primaryColor = const Color(0xFF38BDF8),
+    this.primaryColor = Colors.white,
   });
 
   @override
@@ -37,7 +37,7 @@ class CustomProgressBar extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF94A3B8),
+                      color: Color(0xFFAAAAAA),
                     ),
                   ),
                 if (rightLabel != null)
@@ -66,8 +66,9 @@ class CustomProgressBar extends StatelessWidget {
         Container(
           height: height,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
+            color: const Color(0xFF141414),
             borderRadius: BorderRadius.circular(height / 2),
+            border: Border.all(color: const Color(0x20FFFFFF)),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -79,20 +80,8 @@ class CustomProgressBar extends StatelessWidget {
                     width: constraints.maxWidth * clamped,
                     height: height,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          primaryColor.withAlpha(200),
-                          primaryColor,
-                        ],
-                      ),
+                      color: primaryColor,
                       borderRadius: BorderRadius.circular(height / 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primaryColor.withAlpha(90),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                   ),
                 ],

@@ -46,9 +46,9 @@ class _TerminalLogViewState extends State<TerminalLogView> {
     return Container(
       height: widget.height,
       decoration: BoxDecoration(
-        color: const Color(0xFF070B14),
+        color: const Color(0xFF050505),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1E293B)),
+        border: Border.all(color: const Color(0x28FFFFFF)),
       ),
       child: Column(
         children: [
@@ -56,20 +56,20 @@ class _TerminalLogViewState extends State<TerminalLogView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: const BoxDecoration(
-              color: Color(0xFF0F172A),
+              color: Color(0xFF141414),
               borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
-              border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+              border: Border(bottom: BorderSide(color: Color(0x20FFFFFF))),
             ),
             child: Row(
               children: [
-                const Icon(Icons.terminal_rounded, size: 16, color: Color(0xFF38BDF8)),
+                const Icon(Icons.terminal_rounded, size: 16, color: Colors.white),
                 const SizedBox(width: 8),
                 const Text(
                   'TERMINAL LOGS',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF94A3B8),
+                    color: Color(0xFFAAAAAA),
                     letterSpacing: 1.0,
                     fontFamily: 'monospace',
                   ),
@@ -78,15 +78,16 @@ class _TerminalLogViewState extends State<TerminalLogView> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
+                    color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0x26FFFFFF)),
                   ),
                   child: Text(
                     '${widget.logs.length} EVENTS',
                     style: const TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF38BDF8),
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
                       fontFamily: 'monospace',
                     ),
                   ),
@@ -102,7 +103,7 @@ class _TerminalLogViewState extends State<TerminalLogView> {
                     child: Text(
                       'Ready. Waiting for transfer activity...',
                       style: TextStyle(
-                        color: Color(0xFF475569),
+                        color: Color(0xFF707070),
                         fontFamily: 'monospace',
                         fontSize: 12,
                       ),
@@ -114,13 +115,16 @@ class _TerminalLogViewState extends State<TerminalLogView> {
                     itemCount: widget.logs.length,
                     itemBuilder: (context, index) {
                       final line = widget.logs[index];
-                      Color textColor = const Color(0xFFE2E8F0);
+                      Color textColor = const Color(0xFFD4D4D4);
+                      FontWeight weight = FontWeight.w400;
                       if (line.contains('error') || line.contains('MISMATCH') || line.contains('failed')) {
-                        textColor = const Color(0xFFF87171);
+                        textColor = Colors.white;
+                        weight = FontWeight.w700;
                       } else if (line.contains('verified') || line.contains('completed') || line.contains('saved')) {
-                        textColor = const Color(0xFF4ADE80);
+                        textColor = Colors.white;
+                        weight = FontWeight.w600;
                       } else if (line.contains('started') || line.contains('accepted')) {
-                        textColor = const Color(0xFF38BDF8);
+                        textColor = const Color(0xFFAAAAAA);
                       }
 
                       return Padding(
@@ -131,6 +135,7 @@ class _TerminalLogViewState extends State<TerminalLogView> {
                             fontFamily: 'monospace',
                             fontSize: 11.5,
                             color: textColor,
+                            fontWeight: weight,
                             height: 1.35,
                           ),
                         ),

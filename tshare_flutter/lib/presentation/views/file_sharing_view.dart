@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_theme.dart';
 import '../viewmodels/app_viewmodel.dart';
 import '../viewmodels/sharing_viewmodel.dart';
 import '../widgets/circular_telemetry_gauge.dart';
@@ -61,14 +62,14 @@ class FileSharingView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF94A3B8),
+                      color: AppTheme.themeTextSecondary,
                       letterSpacing: 1.5,
                     ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
                     'Select Action & Connection method. The outer ring rotates to indicate selection.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 12, color: AppTheme.themeTextMuted),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -86,94 +87,96 @@ class FileSharingView extends StatelessWidget {
             // Right: Mirrored Selection Summary Boxes
             Container(
               constraints: const BoxConstraints(maxWidth: 380),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111827),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF1E293B)),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // ACTION Section
-                    const Text(
-                      'ACTION',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.2),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildSelectionOption(
-                      title: 'SEND',
-                      subtitle: 'Transmit files to remote peer',
-                      icon: Icons.upload_rounded,
-                      isSelected: sharingVm.selectedAction == 'SEND',
-                      onTap: () => sharingVm.selectAction('SEND'),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSelectionOption(
-                      title: 'RECEIVE',
-                      subtitle: 'Wait for and accept incoming files',
-                      icon: Icons.download_rounded,
-                      isSelected: sharingVm.selectedAction == 'RECEIVE',
-                      onTap: () => sharingVm.selectAction('RECEIVE'),
-                    ),
-
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Divider(color: Color(0xFF1E293B), height: 1),
-                    ),
-
-                    // CONNECTION Section
-                    const Text(
-                      'CONNECTION',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.2),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildSelectionOption(
-                      title: 'WIFI',
-                      subtitle: 'High speed Local Area Network',
-                      icon: Icons.wifi_rounded,
-                      isSelected: sharingVm.selectedConnection == 'WIFI',
-                      onTap: () => sharingVm.selectConnection('WIFI'),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSelectionOption(
-                      title: 'BLE',
-                      subtitle: 'Bluetooth Low Energy discovery',
-                      icon: Icons.bluetooth_rounded,
-                      isSelected: sharingVm.selectedConnection == 'BLE',
-                      onTap: () => sharingVm.selectConnection('BLE'),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSelectionOption(
-                      title: 'ETHERNET',
-                      subtitle: 'Direct gigabit wired network',
-                      icon: Icons.settings_ethernet_rounded,
-                      isSelected: sharingVm.selectedConnection == 'ETHERNET',
-                      onTap: () => sharingVm.selectConnection('ETHERNET'),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // Confirm Button
-                    ElevatedButton(
-                      onPressed: () => sharingVm.confirmRotarySelection(appVm.downloadDirectory),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        'CONFIRM: ${sharingVm.selectedAction} + ${sharingVm.selectedConnection}',
-                        style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                      ),
-                    ),
-                  ],
-                ),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.themeCardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.themeCardBorder),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+                ],
               ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ACTION Section
+                  const Text(
+                    'ACTION',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSelectionOption(
+                    title: 'SEND',
+                    subtitle: 'Transmit files to remote peer',
+                    icon: Icons.upload_rounded,
+                    isSelected: sharingVm.selectedAction == 'SEND',
+                    onTap: () => sharingVm.selectAction('SEND'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSelectionOption(
+                    title: 'RECEIVE',
+                    subtitle: 'Wait for and accept incoming files',
+                    icon: Icons.download_rounded,
+                    isSelected: sharingVm.selectedAction == 'RECEIVE',
+                    onTap: () => sharingVm.selectAction('RECEIVE'),
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(color: AppTheme.themeCardBorder, height: 1),
+                  ),
+
+                  // CONNECTION Section
+                  const Text(
+                    'CONNECTION',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSelectionOption(
+                    title: 'WIFI',
+                    subtitle: 'High speed Local Area Network',
+                    icon: Icons.wifi_rounded,
+                    isSelected: sharingVm.selectedConnection == 'WIFI',
+                    onTap: () => sharingVm.selectConnection('WIFI'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSelectionOption(
+                    title: 'BLE',
+                    subtitle: 'Bluetooth Low Energy discovery',
+                    icon: Icons.bluetooth_rounded,
+                    isSelected: sharingVm.selectedConnection == 'BLE',
+                    onTap: () => sharingVm.selectConnection('BLE'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSelectionOption(
+                    title: 'ETHERNET',
+                    subtitle: 'Direct gigabit wired network',
+                    icon: Icons.settings_ethernet_rounded,
+                    isSelected: sharingVm.selectedConnection == 'ETHERNET',
+                    onTap: () => sharingVm.selectConnection('ETHERNET'),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Confirm Button
+                  ElevatedButton(
+                    onPressed: () => sharingVm.confirmRotarySelection(appVm.downloadDirectory),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'CONFIRM: ${sharingVm.selectedAction} + ${sharingVm.selectedConnection}',
+                      style: const TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -194,16 +197,16 @@ class FileSharingView extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0284C7).withAlpha(40) : const Color(0xFF0F172A),
+          color: isSelected ? AppTheme.themeCardBgElevated : AppTheme.themeInnerBoxBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+            color: isSelected ? Colors.white : AppTheme.themeInnerBoxBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF94A3B8)),
+            Icon(icon, size: 20, color: isSelected ? Colors.white : AppTheme.themeTextSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -214,18 +217,18 @@ class FileSharingView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
+                      color: isSelected ? Colors.white : const Color(0xFFD4D4D4),
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: const TextStyle(fontSize: 11, color: AppTheme.themeTextMuted),
                   ),
                 ],
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 18),
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
           ],
         ),
       ),
@@ -248,7 +251,7 @@ class FileSharingView extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: () => sharingVm.resetToRotary(),
-                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF94A3B8)),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                 tooltip: 'Back to Rotary Selector',
               ),
               const SizedBox(width: 8),
@@ -258,7 +261,7 @@ class FileSharingView extends StatelessWidget {
                   const Text('DEVICE CONNECTION', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
                   Text(
                     'Selected Mode: ${sharingVm.selectedAction} + ${sharingVm.selectedConnection}',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF38BDF8), fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 13, color: AppTheme.themeTextSecondary, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -268,11 +271,15 @@ class FileSharingView extends StatelessWidget {
                   onPressed: (sharingVm.selectedFiles.isEmpty || (sharingVm.manualIp.isEmpty && sharingVm.targetDevice == null))
                       ? null
                       : () => sharingVm.initiateSendTransfer(hashMode: appVm.defaultHashMode),
-                  icon: const Icon(Icons.send_rounded, size: 16),
+                  icon: const Icon(Icons.send_rounded, size: 16, color: Colors.black),
                   label: const Text('START TRANSFER'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    disabledBackgroundColor: const Color(0xFF222222),
+                    disabledForegroundColor: const Color(0xFF666666),
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
             ],
@@ -286,16 +293,16 @@ class FileSharingView extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 20),
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
+                color: AppTheme.themeCardBgElevated,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF38BDF8), width: 2),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFF38BDF8).withAlpha(60), blurRadius: 16),
+                border: Border.all(color: Colors.white, width: 1.5),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black54, blurRadius: 16),
                 ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.notifications_active_rounded, color: Color(0xFF38BDF8), size: 32),
+                  const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 32),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -308,21 +315,28 @@ class FileSharingView extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${sharingVm.receiver.pendingOffer!.totalFiles} files (${(sharingVm.receiver.pendingOffer!.totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB) • Integrity: ${sharingVm.receiver.pendingOffer!.hashMode.toUpperCase()}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                          style: const TextStyle(fontSize: 12, color: AppTheme.themeTextSecondary),
                         ),
                       ],
                     ),
                   ),
                   OutlinedButton(
                     onPressed: () => sharingVm.receiver.pendingOffer?.decline(),
-                    style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFCCCCCC),
+                      side: const BorderSide(color: Color(0x28FFFFFF)),
+                    ),
                     child: const Text('DECLINE'),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () => sharingVm.receiver.pendingOffer?.accept(),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                    child: const Text('ACCEPT TRANSFER'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('ACCEPT TRANSFER', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ],
               ),
@@ -340,20 +354,20 @@ class FileSharingView extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111827),
+                        color: AppTheme.themeCardBg,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF1E293B)),
+                        border: Border.all(color: AppTheme.themeCardBorder),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Row(
                             children: [
-                              Icon(Icons.tune_rounded, size: 18, color: Color(0xFF38BDF8)),
+                              Icon(Icons.tune_rounded, size: 18, color: Colors.white),
                               SizedBox(width: 8),
                               Text(
                                 'MANUAL CONNECT',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                               ),
                             ],
                           ),
@@ -365,14 +379,23 @@ class FileSharingView extends StatelessWidget {
                                 child: TextFormField(
                                   initialValue: sharingVm.manualIp,
                                   onChanged: (val) => sharingVm.setManualIp(val),
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: Colors.white),
                                   decoration: InputDecoration(
                                     labelText: 'Target IP Address',
+                                    labelStyle: const TextStyle(color: AppTheme.themeTextSecondary),
                                     hintText: 'e.g. 192.168.1.100',
+                                    hintStyle: const TextStyle(color: AppTheme.themeTextMuted),
                                     isDense: true,
                                     filled: true,
-                                    fillColor: const Color(0xFF0F172A),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    fillColor: AppTheme.themeTextFieldBg,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: AppTheme.themeTextFieldBorder),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Colors.white),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -382,13 +405,21 @@ class FileSharingView extends StatelessWidget {
                                 child: TextFormField(
                                   initialValue: '${sharingVm.manualPort}',
                                   readOnly: true,
-                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13, color: Colors.white),
                                   decoration: InputDecoration(
                                     labelText: 'Port',
+                                    labelStyle: const TextStyle(color: AppTheme.themeTextSecondary),
                                     isDense: true,
                                     filled: true,
-                                    fillColor: const Color(0xFF0F172A),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                    fillColor: AppTheme.themeTextFieldBg,
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: AppTheme.themeTextFieldBorder),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Colors.white),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -404,27 +435,27 @@ class FileSharingView extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111827),
+                        color: AppTheme.themeCardBg,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF1E293B)),
+                        border: Border.all(color: AppTheme.themeCardBorder),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.radar_rounded, size: 18, color: Color(0xFF38BDF8)),
+                              const Icon(Icons.radar_rounded, size: 18, color: Colors.white),
                               const SizedBox(width: 8),
                               const Text(
                                 'AUTO FIND DEVICES',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                               ),
                               const Spacer(),
                               if (sharingVm.isAutoDiscovering)
                                 const SizedBox(
                                   width: 14,
                                   height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 ),
                               const SizedBox(width: 8),
                               TextButton(
@@ -435,6 +466,7 @@ class FileSharingView extends StatelessWidget {
                                     sharingVm.startAutoDiscovery();
                                   }
                                 },
+                                style: TextButton.styleFrom(foregroundColor: Colors.white),
                                 child: Text(sharingVm.isAutoDiscovering ? 'STOP SEARCH' : 'SEARCH'),
                               ),
                             ],
@@ -446,7 +478,7 @@ class FileSharingView extends StatelessWidget {
                               alignment: Alignment.center,
                               child: Text(
                                 sharingVm.isAutoDiscovering ? 'Searching for devices on LAN...' : 'No devices discovered. Tap SEARCH.',
-                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                style: const TextStyle(color: AppTheme.themeTextMuted, fontSize: 12),
                               ),
                             )
                           else
@@ -454,23 +486,26 @@ class FileSharingView extends StatelessWidget {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: sharingVm.discoveredDevices.length,
-                              separatorBuilder: (_, _) => const Divider(color: Color(0xFF1E293B), height: 1),
+                              separatorBuilder: (_, _) => const Divider(color: AppTheme.themeCardBorder, height: 1),
                               itemBuilder: (context, idx) {
                                 final dev = sharingVm.discoveredDevices[idx];
                                 final isSelected = sharingVm.targetDevice?.ip == dev.ip;
 
                                 return ListTile(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  leading: const Icon(Icons.laptop_chromebook_rounded, color: Color(0xFF38BDF8)),
-                                  title: Text(dev.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                                  subtitle: Text('${dev.ip}:${dev.port} • ${dev.medium.toUpperCase()}', style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                  leading: const Icon(Icons.laptop_chromebook_rounded, color: Colors.white),
+                                  title: Text(dev.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white)),
+                                  subtitle: Text('${dev.ip}:${dev.port} • ${dev.medium.toUpperCase()}', style: const TextStyle(fontSize: 11, color: AppTheme.themeTextSecondary)),
                                   trailing: ElevatedButton(
                                     onPressed: () => sharingVm.selectDevice(dev),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: isSelected ? const Color(0xFF10B981) : const Color(0xFF1E293B),
+                                      backgroundColor: isSelected ? Colors.white : const Color(0xFF161616),
+                                      foregroundColor: isSelected ? Colors.black : Colors.white,
+                                      side: isSelected ? BorderSide.none : const BorderSide(color: Color(0x28FFFFFF)),
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                     ),
-                                    child: Text(isSelected ? 'SELECTED' : 'SELECT', style: const TextStyle(fontSize: 11)),
+                                    child: Text(isSelected ? 'SELECTED' : 'SELECT', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                                   ),
                                 );
                               },
@@ -491,32 +526,42 @@ class FileSharingView extends StatelessWidget {
                     ? Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
+                          color: AppTheme.themeCardBg,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: AppTheme.themeCardBorder),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.folder_shared_rounded, size: 18, color: Color(0xFF38BDF8)),
+                                const Icon(Icons.folder_shared_rounded, size: 18, color: Colors.white),
                                 const SizedBox(width: 8),
                                 const Text(
                                   'FILES TO SEND',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                                 ),
                                 const Spacer(),
                                 OutlinedButton.icon(
                                   onPressed: () => sharingVm.pickFiles(),
                                   icon: const Icon(Icons.add, size: 14),
                                   label: const Text('ADD FILES', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(color: Color(0x28FFFFFF)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
                                 ),
                                 const SizedBox(width: 6),
                                 OutlinedButton.icon(
                                   onPressed: () => sharingVm.pickDirectory(),
                                   icon: const Icon(Icons.create_new_folder_outlined, size: 14),
                                   label: const Text('ADD FOLDER', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: const BorderSide(color: Color(0x28FFFFFF)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                  ),
                                 ),
                               ],
                             ),
@@ -526,16 +571,16 @@ class FileSharingView extends StatelessWidget {
                                 height: 220,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: const Color(0xFF1E293B), style: BorderStyle.solid),
+                                  border: Border.all(color: AppTheme.themeCardBorder, style: BorderStyle.solid),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.cloud_upload_outlined, size: 36, color: Color(0xFF475569)),
+                                    Icon(Icons.cloud_upload_outlined, size: 36, color: AppTheme.themeTextMuted),
                                     SizedBox(height: 8),
-                                    Text('No files selected yet.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                                    Text('Tap Add Files or Add Folder above.', style: TextStyle(color: Color(0xFF475569), fontSize: 11)),
+                                    Text('No files selected yet.', style: TextStyle(color: AppTheme.themeTextSecondary, fontSize: 13)),
+                                    Text('Tap Add Files or Add Folder above.', style: TextStyle(color: AppTheme.themeTextMuted, fontSize: 11)),
                                   ],
                                 ),
                               )
@@ -543,26 +588,27 @@ class FileSharingView extends StatelessWidget {
                               Container(
                                 height: 220,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF0F172A),
+                                  color: AppTheme.themeInnerBoxBg,
                                   borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppTheme.themeInnerBoxBorder),
                                 ),
                                 child: ListView.separated(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   itemCount: sharingVm.selectedFiles.length,
-                                  separatorBuilder: (_, _) => const Divider(color: Color(0xFF1E293B), height: 1),
+                                  separatorBuilder: (_, _) => const Divider(color: AppTheme.themeCardBorder, height: 1),
                                   itemBuilder: (context, idx) {
                                     final file = sharingVm.selectedFiles[idx];
                                     return ListTile(
                                       dense: true,
                                       leading: Icon(
                                         file.isDirectory ? Icons.folder_rounded : Icons.insert_drive_file_rounded,
-                                        color: const Color(0xFF38BDF8),
+                                        color: Colors.white,
                                         size: 18,
                                       ),
-                                      title: Text(file.name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
-                                      subtitle: Text(file.formattedSize, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                      title: Text(file.name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white)),
+                                      subtitle: Text(file.formattedSize, style: const TextStyle(fontSize: 11, color: AppTheme.themeTextSecondary)),
                                       trailing: IconButton(
-                                        icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                                        icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFCCCCCC)),
                                         onPressed: () => sharingVm.removeFile(idx),
                                       ),
                                     );
@@ -575,13 +621,13 @@ class FileSharingView extends StatelessWidget {
                     : Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF111827),
+                          color: AppTheme.themeCardBg,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: AppTheme.themeCardBorder),
                         ),
                         child: Column(
                           children: [
-                            const Icon(Icons.cell_tower_rounded, color: Color(0xFF38BDF8), size: 48),
+                            const Icon(Icons.cell_tower_rounded, color: Colors.white, size: 48),
                             const SizedBox(height: 16),
                             const Text(
                               'Receiver Server Active',
@@ -590,19 +636,20 @@ class FileSharingView extends StatelessWidget {
                             const SizedBox(height: 6),
                             Text(
                               'Listening for incoming connections on port ${AppConstants.tcpTransferPort}.\nSender devices on this network will discover this receiver automatically.',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), height: 1.4),
+                              style: const TextStyle(fontSize: 12, color: AppTheme.themeTextSecondary, height: 1.4),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 20),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0F172A),
+                                color: AppTheme.themePillBg,
                                 borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppTheme.themePillBorder),
                               ),
                               child: Text(
                                 'Saving to: ${appVm.downloadDirectory}',
-                                style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF38BDF8)),
+                                style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.white),
                               ),
                             ),
                           ],
@@ -629,19 +676,18 @@ class FileSharingView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: AppTheme.themeCardBg,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.themeCardBorder),
             ),
             child: Row(
               children: [
                 Icon(
                   sharingVm.isCompleted
                       ? Icons.check_circle_rounded
-                      : (sharingVm.isError ? Icons.error_rounded : Icons.sync_rounded),
-                  color: sharingVm.isCompleted
-                      ? const Color(0xFF10B981)
-                      : (sharingVm.isError ? const Color(0xFFEF4444) : const Color(0xFF38BDF8)),
+                      : (sharingVm.isError ? Icons.error_outline_rounded : Icons.sync_rounded),
+                  color: Colors.white,
+                  size: 24,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -656,7 +702,7 @@ class FileSharingView extends StatelessWidget {
                       ),
                       Text(
                         '${sharingVm.selectedAction} via ${sharingVm.selectedConnection} • Peer: ${sharingVm.peerName} • Integrity: ${sharingVm.activeHashMode.toUpperCase()}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                        style: const TextStyle(fontSize: 12, color: AppTheme.themeTextSecondary),
                       ),
                     ],
                   ),
@@ -666,14 +712,22 @@ class FileSharingView extends StatelessWidget {
                     onPressed: () => sharingVm.cancelTransfer(),
                     icon: const Icon(Icons.cancel_outlined, size: 16),
                     label: const Text('CANCEL'),
-                    style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFCCCCCC),
+                      side: const BorderSide(color: Color(0x28FFFFFF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   )
                 else
                   ElevatedButton.icon(
                     onPressed: () => sharingVm.resetToRotary(),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    icon: const Icon(Icons.refresh_rounded, size: 16, color: Colors.black),
                     label: const Text('NEW TRANSFER'),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0284C7)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
               ],
             ),
@@ -691,9 +745,9 @@ class FileSharingView extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111827),
+                    color: AppTheme.themeCardBg,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFF1E293B)),
+                    border: Border.all(color: AppTheme.themeCardBorder),
                   ),
                   child: Column(
                     children: [
@@ -705,14 +759,14 @@ class FileSharingView extends StatelessWidget {
                             maxValue: 200,
                             label: 'Speed',
                             unit: 'MB/s',
-                            primaryColor: const Color(0xFF38BDF8),
+                            primaryColor: Colors.white,
                           ),
                           CircularTelemetryGauge(
                             value: sharingVm.currentCpuPercent,
                             maxValue: 100,
                             label: 'CPU',
                             unit: '%',
-                            primaryColor: const Color(0xFF10B981),
+                            primaryColor: AppTheme.themeAccentSilver,
                           ),
                         ],
                       ),

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/theme/app_theme.dart';
 import '../viewmodels/app_viewmodel.dart';
 
 class SettingsView extends StatelessWidget {
@@ -23,24 +24,23 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: AppTheme.themeCardBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF334155)),
+              border: Border.all(color: AppTheme.themeCardBorder),
+              boxShadow: const [
+                BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4)),
+              ],
             ),
             child: const Row(
               children: [
-                Icon(Icons.settings_rounded, color: Color(0xFF38BDF8), size: 32),
+                Icon(Icons.settings_rounded, color: Colors.white, size: 32),
                 SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('APPLICATION SETTINGS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
                     SizedBox(height: 2),
-                    Text('Manage storage directories, network protocol framing, and hashing security.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+                    Text('Manage storage directories, network protocol framing, and hashing security.', style: TextStyle(fontSize: 12, color: AppTheme.themeTextSecondary)),
                   ],
                 ),
               ],
@@ -53,20 +53,20 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: AppTheme.themeCardBg,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.themeCardBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.folder_rounded, color: Color(0xFF38BDF8), size: 18),
+                    Icon(Icons.folder_rounded, color: Colors.white, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'DEFAULT DOWNLOAD DIRECTORY',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                     ),
                   ],
                 ),
@@ -77,9 +77,9 @@ class SettingsView extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
+                          color: AppTheme.themeInnerBoxBg,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF1E293B)),
+                          border: Border.all(color: AppTheme.themeInnerBoxBorder),
                         ),
                         child: Text(
                           appVm.downloadDirectory,
@@ -95,9 +95,14 @@ class SettingsView extends StatelessWidget {
                           await appVm.setDownloadDirectory(selected);
                         }
                       },
-                      icon: const Icon(Icons.folder_open_rounded, size: 16),
+                      icon: const Icon(Icons.folder_open_rounded, size: 16, color: Colors.black),
                       label: const Text('BROWSE'),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0284C7)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
                     ),
                   ],
                 ),
@@ -111,27 +116,27 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: AppTheme.themeCardBg,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.themeCardBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.security_rounded, color: Color(0xFF38BDF8), size: 18),
+                    Icon(Icons.security_rounded, color: Colors.white, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'BLOCK INTEGRITY MODE',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 const Text(
                   'Select the checksum calculation applied per 4 MB streaming frame:',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: AppTheme.themeTextMuted),
                 ),
                 const SizedBox(height: 16),
                 _buildRadioOption(
@@ -167,20 +172,20 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF111827),
+              color: AppTheme.themeCardBg,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF1E293B)),
+              border: Border.all(color: AppTheme.themeCardBorder),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, color: Color(0xFF38BDF8), size: 18),
+                    Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
                     SizedBox(width: 8),
                     Text(
                       'SYSTEM & PROTOCOL INFORMATION',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF94A3B8), letterSpacing: 1.0),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.themeTextSecondary, letterSpacing: 1.0),
                     ),
                   ],
                 ),
@@ -215,10 +220,10 @@ class SettingsView extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0284C7).withAlpha(30) : const Color(0xFF0F172A),
+          color: isSelected ? AppTheme.themeCardBgElevated : AppTheme.themeInnerBoxBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+            color: isSelected ? Colors.white : AppTheme.themeInnerBoxBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -230,8 +235,8 @@ class SettingsView extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF64748B),
-                  width: 2,
+                  color: isSelected ? Colors.white : AppTheme.themeTextMuted,
+                  width: isSelected ? 2 : 1.5,
                 ),
               ),
               child: isSelected
@@ -241,7 +246,7 @@ class SettingsView extends StatelessWidget {
                         height: 8,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Color(0xFF38BDF8),
+                          color: Colors.white,
                         ),
                       ),
                     )
@@ -257,13 +262,13 @@ class SettingsView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
+                      color: isSelected ? Colors.white : const Color(0xFFD4D4D4),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     description,
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    style: const TextStyle(fontSize: 11, color: AppTheme.themeTextMuted),
                   ),
                 ],
               ),
@@ -280,7 +285,7 @@ class SettingsView extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.themeTextSecondary)),
           const SizedBox(width: 12),
           Flexible(
             child: Text(

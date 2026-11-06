@@ -15,7 +15,7 @@ class CircularTelemetryGauge extends StatelessWidget {
     required this.maxValue,
     required this.label,
     required this.unit,
-    this.primaryColor = const Color(0xFF38BDF8),
+    this.primaryColor = Colors.white,
     this.size = 140,
   });
 
@@ -33,7 +33,7 @@ class CircularTelemetryGauge extends StatelessWidget {
             size: Size(size, size),
             painter: _GaugePainter(
               ratio: ratio,
-              trackColor: const Color(0xFF1E293B),
+              trackColor: const Color(0xFF1C1C1C),
               activeColor: primaryColor,
             ),
           ),
@@ -65,7 +65,7 @@ class CircularTelemetryGauge extends StatelessWidget {
                 style: TextStyle(
                   fontSize: size * 0.08,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF94A3B8),
+                  color: const Color(0xFFAAAAAA),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -92,7 +92,7 @@ class _GaugePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width / 2) - 10;
-    const strokeWidth = 9.0;
+    const strokeWidth = 8.0;
 
     // 240 degree sweep from 150 to 390 degrees
     const startAngle = 150 * (pi / 180);
@@ -113,24 +113,9 @@ class _GaugePainter extends CustomPainter {
       trackPaint,
     );
 
-    // Active arc with glow
+    // Active arc (crisp monochrome stroke)
     if (ratio > 0) {
       final sweepAngle = totalSweep * ratio;
-
-      final glowPaint = Paint()
-        ..color = activeColor.withAlpha(80)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth + 4
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweepAngle,
-        false,
-        glowPaint,
-      );
 
       final activePaint = Paint()
         ..color = activeColor

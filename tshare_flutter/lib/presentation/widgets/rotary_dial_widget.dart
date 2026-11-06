@@ -174,23 +174,22 @@ class _RotaryDialWidgetState extends State<RotaryDialWidget> with SingleTickerPr
                 height: 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF0F172A),
+                  color: const Color(0xFF161616),
                   border: Border.all(
-                    color: const Color(0xFF38BDF8),
-                    width: 2.5,
+                    color: Colors.white,
+                    width: 2.0,
                   ),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
-                      color: const Color(0xFF38BDF8).withAlpha(120),
-                      blurRadius: 16,
-                      spreadRadius: 2,
+                      color: Color(0x28FFFFFF),
+                      blurRadius: 12,
                     ),
                   ],
                 ),
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded, color: Color(0xFF38BDF8), size: 24),
+                    Icon(Icons.check_rounded, color: Colors.white, size: 24),
                     SizedBox(height: 3),
                     Text(
                       'SELECT',
@@ -227,29 +226,20 @@ class _StationaryOptionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBg = isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B);
-    final activeBorder = isSelected ? const Color(0xFF38BDF8) : const Color(0xFF334155);
-    final activeText = isSelected ? Colors.white : const Color(0xFF94A3B8);
+    final activeBg = isSelected ? Colors.white : const Color(0xFF101010);
+    final activeBorder = isSelected ? Colors.white : const Color(0x28FFFFFF);
+    final activeText = isSelected ? Colors.black : const Color(0xFFAAAAAA);
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: activeBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: activeBorder, width: isSelected ? 2 : 1),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF0284C7).withAlpha(140),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : null,
+          border: Border.all(color: activeBorder, width: isSelected ? 1.5 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -260,7 +250,7 @@ class _StationaryOptionButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
                 color: activeText,
                 letterSpacing: 0.5,
               ),
@@ -280,7 +270,7 @@ class _OuterRingPainter extends CustomPainter {
 
     // Background track ring
     final ringPaint = Paint()
-      ..color = const Color(0xFF1E293B)
+      ..color = const Color(0xFF181818)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 14;
 
@@ -294,31 +284,31 @@ class _OuterRingPainter extends CustomPainter {
       final hY = center.dy + (radius * sin(angle));
 
       final holeBorder = Paint()
-        ..color = const Color(0xFF334155)
+        ..color = const Color(0x28FFFFFF)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = 1.5;
       canvas.drawCircle(Offset(hX, hY), 8, holeBorder);
 
       final holeFill = Paint()
-        ..color = const Color(0xFF0B0F19)
+        ..color = const Color(0xFF0A0A0A)
         ..style = PaintingStyle.fill;
       canvas.drawCircle(Offset(hX, hY), 7, holeFill);
     }
 
-    // Active Indicator Notch
+    // Active Indicator Notch (Crisp white pip without neon glow)
     final notchX = center.dx + (radius * cos(0));
     final notchY = center.dy + (radius * sin(0));
 
-    final glowPaint = Paint()
-      ..color = const Color(0xFF38BDF8).withAlpha(160)
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawCircle(Offset(notchX, notchY), 10, glowPaint);
+    final notchBorder = Paint()
+      ..color = const Color(0xFF000000)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(Offset(notchX, notchY), 8, notchBorder);
 
     final notchPaint = Paint()
-      ..color = const Color(0xFF38BDF8)
+      ..color = Colors.white
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(notchX, notchY), 6, notchPaint);
+    canvas.drawCircle(Offset(notchX, notchY), 7, notchPaint);
   }
 
   @override
