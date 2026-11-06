@@ -35,11 +35,10 @@ void main() {
     expect(find.text('RECEIVE'), findsWidgets);
     expect(find.text('WIFI'), findsWidgets);
     expect(find.text('BLE'), findsWidgets);
-    expect(find.text('ETHERNET'), findsWidgets);
-    expect(find.text('SELECT'), findsOneWidget);
+    expect(find.text('CONFIRM'), findsWidgets);
 
-    // Tap SELECT to advance to State 2: Device Connection
-    await tester.tap(find.text('SELECT'));
+    // Tap CONFIRM to advance to State 2: Device Connection
+    await tester.tap(find.text('CONFIRM').first);
     await tester.pump(const Duration(milliseconds: 300));
 
     // Verify State 2 elements

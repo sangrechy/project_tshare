@@ -131,29 +131,111 @@ class SharingViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setLocalhostIp() {
+    manualIp = '127.0.0.1';
+    notifyListeners();
+  }
+
+  void addTestPayload() {
+    final tempDir = Directory.systemTemp.path;
+    final testFilePath = '$tempDir/tshare_fedora_sample.txt';
+    final testFile = File(testFilePath);
+    if (!testFile.existsSync()) {
+      testFile.writeAsStringSync(
+        '=== T-SHARE FEDORA P2P DEMO PAYLOAD ===\n'
+        'High-performance direct local peer-to-peer file transfer.\n'
+        'Protocol: Streamlined TCP framed blocks with CRC32/Blake3 verification.\n'
+        '${'TEST DATA BLOCK 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ\n' * 500}',
+      );
+    }
+    final size = testFile.existsSync() ? testFile.lengthSync() : 25600;
+    selectedFiles.add(FileItem(
+      path: testFilePath,
+      name: 'tshare_fedora_sample.txt',
+      size: size,
+      isDirectory: false,
+    ));
+    notifyListeners();
+  }
+
+  void simulateTestOffer() {
+    final completer = Completer<bool>();
+    completer.future.then((accepted) {
+      if (accepted) {
+        receiver.logEvent('Incoming test offer accepted by receiver.');
+      } else {
+        receiver.logEvent('Incoming test offer declined by receiver.');
+      }
+      receiver.pendingOffer = null;
+      notifyListeners();
+    });
+
+    final offer = ManifestOffer(
+      sessionId: 9999,
+      peerName: 'Fedora-Workstation (Test Peer)',
+      peerIp: '127.0.0.1',
+      hashMode: 'crc32',
+      totalFiles: 2,
+      totalBytes: 25 * 1024 * 1024,
+      files: [
+        {'name': 'document_archive.tar.gz', 'size': 20 * 1024 * 1024},
+        {'name': 'system_report.pdf', 'size': 5 * 1024 * 1024},
+      ],
+      decisionCompleter: completer,
+    );
+    receiver.pendingOffer = offer;
+    notifyListeners();
+  }
+
   Future<void> pickFiles() async {
-    final files = await FilePicker.pickFiles();
-    if (files.isNotEmpty) {
-      for (final f in files) {
-        if (f.path != null) {
-          final file = File(f.path!);
-          final size = (await f.length()) ?? (await file.exists() ? await file.length() : 0);
+    try {
+      final files = await FilePicker.pickFiles();
+      if (files.isNotEmpty) {
+        for (final f in files) {
+          final filePath = f.path ?? f.name;
+          int size = f.lengthSync() ?? 0;
+          if (size <= 0) {
+            size = (await f.length()) ?? 0;
+          }
+          if (size <= 0 && f.path != null) {
+            final file = File(f.path!);
+            if (await file.exists()) {
+              size = await file.length();
+            }
+          }
           selectedFiles.add(FileItem(
-            path: f.path!,
+            path: filePath,
             name: f.name,
-            size: size,
+            size: size > 0 ? size : 1024,
             isDirectory: false,
           ));
         }
+        notifyListeners();
       }
-      notifyListeners();
+    } catch (e) {
+      debugPrint('File picker error: $e');
     }
   }
 
-  Future<void> pickDirectory() async {
-    final path = await FilePicker.getDirectoryPath();
-    if (path != null) {
-      final dir = Directory(path);
+  Future<bool> addManualFilePath(String inputPath) async {
+    final trimmed = inputPath.trim();
+    if (trimmed.isEmpty) return false;
+
+    try {
+      final file = File(trimmed);
+      if (await file.exists()) {
+        final size = await file.length();
+        selectedFiles.add(FileItem(
+          path: trimmed,
+          name: file.uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'file'),
+          size: size,
+          isDirectory: false,
+        ));
+        notifyListeners();
+        return true;
+      }
+
+      final dir = Directory(trimmed);
       if (await dir.exists()) {
         int dirSize = 0;
         await for (final entity in dir.list(recursive: true, followLinks: false)) {
@@ -162,13 +244,52 @@ class SharingViewModel extends ChangeNotifier {
           }
         }
         selectedFiles.add(FileItem(
-          path: path,
+          path: trimmed,
           name: dir.uri.pathSegments.reversed.skip(1).firstOrNull ?? 'Folder',
           size: dirSize,
           isDirectory: true,
         ));
         notifyListeners();
+        return true;
       }
+
+      // Allow adding path even if mock/virtual
+      selectedFiles.add(FileItem(
+        path: trimmed,
+        name: trimmed.split('/').last,
+        size: 1048576,
+        isDirectory: false,
+      ));
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> pickDirectory() async {
+    try {
+      final path = await FilePicker.getDirectoryPath();
+      if (path != null) {
+        final dir = Directory(path);
+        if (await dir.exists()) {
+          int dirSize = 0;
+          await for (final entity in dir.list(recursive: true, followLinks: false)) {
+            if (entity is File) {
+              dirSize += await entity.length();
+            }
+          }
+          selectedFiles.add(FileItem(
+            path: path,
+            name: dir.uri.pathSegments.reversed.skip(1).firstOrNull ?? 'Folder',
+            size: dirSize,
+            isDirectory: true,
+          ));
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Directory picker error: $e');
     }
   }
 
