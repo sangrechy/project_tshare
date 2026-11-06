@@ -1,10 +1,6 @@
 /**
- * T-Share Unified Frontend Application Logic
- * Integrates:
- * 1. Direct Cable P2P Engine with Dynamic Integrity Toggle (SHA-256 / CRC32 / None)
- * 2. LAN Web Portal (File Server & Mobile Uploads with QR Code)
- * 3. Two-Tier Verification Audits (Quick Parity + Full Cryptographic SHA-256)
- * 4. Transparent API Proxy for Browser Mode fallback
+ * TShare — Unified Desktop Application Logic
+ * Implements 5 Navigation Menus and 3-State Rotary File Sharing Workflow
  */
 
 // Browser Mode Transparent API Bridge Polyfill
@@ -24,7 +20,7 @@ if (!window.pywebview) {
             }
             return await resp.json();
           } catch (err) {
-            console.error(`Browser Mode API error on ${String(prop)}:`, err);
+            console.error(`API bridge error on ${String(prop)}:`, err);
             return { error: String(err) };
           }
         };
@@ -33,630 +29,1263 @@ if (!window.pywebview) {
   };
 }
 
-// Application State
+// Global State
 let activeTab = 'home';
-let selectedMedium = 'ethernet';
-let selectedTargetIp = '';
-let selectedTargetPort = 52001;
-let selectedHashMode = 'crc32';
-let selectedVerifySessionId = null;
+let currentSharingState = 1; // 1: Rotary, 2: Device Connect, 3: Transfer Dashboard
+let selectedAction = null; // 'SEND' | 'RECEIVE'
+let selectedMethod = null; // 'WIFI' | 'BLE' | 'ETHERNET'
+let connectedDevice = null;
 let currentPendingOffer = null;
 let pollTimer = null;
-let appInitialized = false;
+
+// Helpers
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const item = document.createElement('div');
+  item.className = `toast-item ${type}`;
+  item.textContent = message;
+  container.appendChild(item);
+  setTimeout(() => {
+    item.style.opacity = '0';
+    item.style.transform = 'translateY(10px)';
+    item.style.transition = 'all 0.3s ease';
+    setTimeout(() => item.remove(), 300);
+  }, 3500);
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return '0.0 MB';
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1024) {
+    return (mb / 1024).toFixed(2) + ' GB';
+  }
+  return mb.toFixed(1) + ' MB';
+}
+
+function formatDuration(sec) {
+  if (!sec || sec <= 0) return '--:--';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
 
 // DOM Initialization
 document.addEventListener('DOMContentLoaded', () => {
-  setupTabNavigation();
-  setupWireControls();
-  setupPortalControls();
-  setupVerifyControls();
-  setupHistoryControls();
-  setupSettingsControls();
-  setupAuthModalControls();
+  setupNavigation();
+  setupHomeTab();
+  setupRotaryStage();
+  setupDeviceConnectionStage();
+  setupTransferDashboardStage();
+  setupFileServerTab();
+  setupVerifyTab();
+  setupSettingsTab();
 
-  // Listen for manual IP changes
-  const manualIp = document.getElementById('manualIpInput');
-  const manualPort = document.getElementById('manualPortInput');
-  if (manualIp) manualIp.addEventListener('input', () => { selectedTargetIp = manualIp.value.trim(); });
-  if (manualPort) manualPort.addEventListener('input', () => { selectedTargetPort = parseInt(manualPort.value.trim()) || 52001; });
-
-  const selHash = document.getElementById('selHashMode');
-  if (selHash) selHash.addEventListener('change', () => { selectedHashMode = selHash.value; });
-
-  // PyWebView Ready Check
-  if (window.pywebview && window.pywebview.api) {
-    initApp();
-  } else {
-    window.addEventListener('pywebviewready', () => { initApp(); });
-    setTimeout(() => { if (!appInitialized) initApp(); }, 400);
-  }
+  // Start Background Telemetry Polling (Every 800ms)
+  pollTimer = setInterval(pollAppTelemetry, 800);
+  pollAppTelemetry();
 });
 
-function initApp() {
-  if (appInitialized) return;
-  appInitialized = true;
-
-  loadNetworkPill();
-  loadPortalStatus();
-  loadSettings();
-  loadHistory();
-
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(updateTelemetry, 250);
-}
-
-// ----------------- TAB NAVIGATION -----------------
-
-function setupTabNavigation() {
-  const tabs = document.querySelectorAll('.nav-tab');
-  tabs.forEach(tab => {
+// ========================================================
+// 1. TOP NAVIGATION (5 MENUS)
+// ========================================================
+function setupNavigation() {
+  const navTabs = document.querySelectorAll('.nav-tab');
+  navTabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      const target = tab.getAttribute('data-tab');
-      switchTab(target);
+      const targetTab = tab.getAttribute('data-tab');
+      switchTab(targetTab);
     });
   });
 }
 
-function switchTab(tabName) {
-  activeTab = tabName;
+function switchTab(tabId) {
+  activeTab = tabId;
 
-  document.querySelectorAll('.nav-tab').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-tab') === tabName);
+  document.querySelectorAll('.nav-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
   });
 
   document.querySelectorAll('.tab-panel').forEach(p => {
-    p.classList.toggle('active', p.id === `tab-${tabName}`);
+    p.classList.toggle('active', p.id === `tab-${tabId}`);
   });
 
-  if (tabName === 'history') {
-    loadHistory();
-  } else if (tabName === 'verify') {
-    loadVerifyLedgers();
-  } else if (tabName === 'portal') {
-    loadPortalStatus();
-  } else if (tabName === 'wire') {
-    loadNetworkPill();
+  if (tabId === 'file-server') {
+    refreshFileServerInfo();
+  } else if (tabId === 'verify') {
+    loadPastAuditSessions();
+  } else if (tabId === 'home') {
+    loadHomeDefaultDestination();
   }
 }
 
-// ----------------- TELEMETRY & HOME TAB -----------------
+// ========================================================
+// 2. HOME TAB
+// ========================================================
+function setupHomeTab() {
+  loadHomeDefaultDestination();
 
-async function updateTelemetry() {
-  if (!window.pywebview || !window.pywebview.api) return;
+  const btnPick = document.getElementById('btnHomePickDestination');
+  const btnSave = document.getElementById('btnHomeSaveDestination');
+  const inputDest = document.getElementById('homeDestinationInput');
 
+  if (btnPick) {
+    btnPick.addEventListener('click', async () => {
+      try {
+        const res = await window.pywebview.api.select_destination_folder();
+        if (res && res.path) {
+          inputDest.value = res.path;
+        }
+      } catch (e) {
+        showToast('Error selecting folder: ' + e, 'error');
+      }
+    });
+  }
+
+  if (btnSave) {
+    btnSave.addEventListener('click', async () => {
+      const path = inputDest.value.trim();
+      if (!path) {
+        showToast('Please enter or select a destination path', 'error');
+        return;
+      }
+      try {
+        const res = await window.pywebview.api.save_default_destination(path);
+        if (res && res.success) {
+          showToast('Destination path saved as default receiving location', 'success');
+        } else {
+          showToast(res.error || 'Failed to save destination', 'error');
+        }
+      } catch (e) {
+        showToast('Error saving destination: ' + e, 'error');
+      }
+    });
+  }
+}
+
+async function loadHomeDefaultDestination() {
+  try {
+    const res = await window.pywebview.api.get_default_destination();
+    if (res && res.path) {
+      const input = document.getElementById('homeDestinationInput');
+      const settingsInput = document.getElementById('settingsDestInput');
+      if (input) input.value = res.path;
+      if (settingsInput) settingsInput.value = res.path;
+    }
+  } catch (e) {
+    console.error('Failed to load default destination:', e);
+  }
+}
+
+// ========================================================
+// 3. FILE SHARING TAB (3 States)
+// ========================================================
+function setSharingState(stateNum) {
+  currentSharingState = stateNum;
+
+  document.getElementById('sharingState1').classList.toggle('active', stateNum === 1);
+  document.getElementById('sharingState2').classList.toggle('active', stateNum === 2);
+  document.getElementById('sharingState3').classList.toggle('active', stateNum === 3);
+
+  if (stateNum === 2) {
+    initDeviceConnectionView();
+  }
+}
+
+// --------------------------------------------------------
+// STATE 1: ROTARY SELECTION INTERFACE
+// --------------------------------------------------------
+function setupRotaryStage() {
+  const outerRing = document.getElementById('rotaryOuterRing');
+  const btnSelect = document.getElementById('btnRotaryCenterSelect');
+  const btnConfirm = document.getElementById('btnConfirmSelection');
+
+  // Option Nodes
+  const nodeSend = document.getElementById('nodeSend');
+  const nodeReceive = document.getElementById('nodeReceive');
+  const nodeWifi = document.getElementById('nodeWifi');
+  const nodeBle = document.getElementById('nodeBle');
+  const nodeEthernet = document.getElementById('nodeEthernet');
+
+  function rotateRingTo(angleDeg) {
+    if (outerRing) {
+      outerRing.style.transform = `rotate(${angleDeg}deg)`;
+    }
+  }
+
+  // Click SEND
+  nodeSend.addEventListener('click', () => {
+    selectedAction = 'SEND';
+    nodeSend.classList.add('active');
+    nodeReceive.classList.remove('active');
+    rotateRingTo(nodeSend.getAttribute('data-angle') || 155);
+    updateRotaryMirrors();
+  });
+
+  // Click RECEIVE
+  nodeReceive.addEventListener('click', () => {
+    selectedAction = 'RECEIVE';
+    nodeReceive.classList.add('active');
+    nodeSend.classList.remove('active');
+    rotateRingTo(nodeReceive.getAttribute('data-angle') || 205);
+    updateRotaryMirrors();
+  });
+
+  // Click WIFI
+  nodeWifi.addEventListener('click', () => {
+    selectedMethod = 'WIFI';
+    nodeWifi.classList.add('active');
+    nodeBle.classList.remove('active');
+    nodeEthernet.classList.remove('active');
+    rotateRingTo(nodeWifi.getAttribute('data-angle') || 90);
+    updateRotaryMirrors();
+  });
+
+  // Click BLE
+  nodeBle.addEventListener('click', () => {
+    selectedMethod = 'BLE';
+    nodeBle.classList.add('active');
+    nodeWifi.classList.remove('active');
+    nodeEthernet.classList.remove('active');
+    rotateRingTo(nodeBle.getAttribute('data-angle') || 25);
+    updateRotaryMirrors();
+  });
+
+  // Click ETHERNET
+  nodeEthernet.addEventListener('click', () => {
+    selectedMethod = 'ETHERNET';
+    nodeEthernet.classList.add('active');
+    nodeWifi.classList.remove('active');
+    nodeBle.classList.remove('active');
+    rotateRingTo(nodeEthernet.getAttribute('data-angle') || 335);
+    updateRotaryMirrors();
+  });
+
+  function updateRotaryMirrors() {
+    const badgeAction = document.getElementById('badgeSelectedAction');
+    const badgeMethod = document.getElementById('badgeSelectedMethod');
+    const mirrorSend = document.getElementById('mirrorSend');
+    const mirrorReceive = document.getElementById('mirrorReceive');
+    const mirrorWifi = document.getElementById('mirrorWifi');
+    const mirrorBle = document.getElementById('mirrorBle');
+    const mirrorEthernet = document.getElementById('mirrorEthernet');
+    const formulaText = document.getElementById('chosenFormulaText');
+
+    if (badgeAction) badgeAction.textContent = selectedAction || 'SELECT ACTION';
+    if (badgeMethod) badgeMethod.textContent = selectedMethod || 'SELECT METHOD';
+
+    mirrorSend.classList.toggle('active', selectedAction === 'SEND');
+    mirrorReceive.classList.toggle('active', selectedAction === 'RECEIVE');
+
+    mirrorWifi.classList.toggle('active', selectedMethod === 'WIFI');
+    mirrorBle.classList.toggle('active', selectedMethod === 'BLE');
+    mirrorEthernet.classList.toggle('active', selectedMethod === 'ETHERNET');
+
+    if (selectedAction && selectedMethod) {
+      formulaText.textContent = `Selected: ${selectedAction} + ${selectedMethod}`;
+      btnConfirm.disabled = false;
+    } else if (selectedAction) {
+      formulaText.textContent = `Action: ${selectedAction} · Now select Connection Method`;
+      btnConfirm.disabled = true;
+    } else if (selectedMethod) {
+      formulaText.textContent = `Method: ${selectedMethod} · Now select SEND or RECEIVE`;
+      btnConfirm.disabled = true;
+    } else {
+      formulaText.textContent = 'Please make your selection';
+      btnConfirm.disabled = true;
+    }
+  }
+
+  function handleConfirm() {
+    if (!selectedAction || !selectedMethod) {
+      showToast('Please select both an Action (SEND/RECEIVE) and a Connection Method (WIFI/BLE/ETHERNET)', 'error');
+      return;
+    }
+    // Transition to State 2
+    setSharingState(2);
+  }
+
+  btnSelect.addEventListener('click', handleConfirm);
+  btnConfirm.addEventListener('click', handleConfirm);
+}
+
+// --------------------------------------------------------
+// STATE 2: DEVICE CONNECTION INTERFACE
+// --------------------------------------------------------
+function setupDeviceConnectionStage() {
+  const btnBack = document.getElementById('btnBackToRotary');
+  const tabManual = document.getElementById('tabManualConnect');
+  const tabAuto = document.getElementById('tabAutoFind');
+  const btnDoConnect = document.getElementById('btnDoManualConnect');
+  const btnTriggerScan = document.getElementById('btnTriggerScan');
+
+  btnBack.addEventListener('click', () => {
+    setSharingState(1);
+  });
+
+  tabManual.addEventListener('click', () => {
+    tabManual.classList.add('active');
+    tabAuto.classList.remove('active');
+    document.getElementById('viewManualConnect').classList.add('active');
+    document.getElementById('viewAutoFind').classList.remove('active');
+  });
+
+  tabAuto.addEventListener('click', () => {
+    tabAuto.classList.add('active');
+    tabManual.classList.remove('active');
+    document.getElementById('viewAutoFind').classList.add('active');
+    document.getElementById('viewManualConnect').classList.remove('active');
+    triggerDeviceScan();
+  });
+
+  btnDoConnect.addEventListener('click', async () => {
+    await performManualConnection();
+  });
+
+  btnTriggerScan.addEventListener('click', () => {
+    triggerDeviceScan();
+  });
+
+  // Direct Cable IP Setup Button
+  const btnAutoIp = document.getElementById('btnAutoSetupEthIp');
+  if (btnAutoIp) {
+    btnAutoIp.addEventListener('click', async () => {
+      try {
+        const res = await window.pywebview.api.configure_ethernet('');
+        if (res.requires_sudo) {
+          openAuthModal();
+        } else if (res.success) {
+          showToast('Direct cable interface configured (192.168.123.x)', 'success');
+          document.getElementById('inputManualIp').value = '192.168.123.1';
+        } else {
+          showToast(res.error || 'Failed to setup cable IP', 'error');
+        }
+      } catch (e) {
+        showToast('Configuration error: ' + e, 'error');
+      }
+    });
+  }
+
+  // Sender File Selection Buttons
+  const btnPickFiles = document.getElementById('btnState2PickFiles');
+  const btnPickFolder = document.getElementById('btnState2PickFolder');
+  const btnClearFiles = document.getElementById('btnState2ClearFiles');
+  const btnStartSend = document.getElementById('btnState2StartSend');
+
+  btnPickFiles.addEventListener('click', async () => {
+    try {
+      const summary = await window.pywebview.api.select_source_files();
+      renderSelectedFiles(summary);
+    } catch (e) {
+      showToast('Error picking files: ' + e, 'error');
+    }
+  });
+
+  btnPickFolder.addEventListener('click', async () => {
+    try {
+      const summary = await window.pywebview.api.select_source_folder();
+      renderSelectedFiles(summary);
+    } catch (e) {
+      showToast('Error picking folder: ' + e, 'error');
+    }
+  });
+
+  btnClearFiles.addEventListener('click', async () => {
+    try {
+      const summary = await window.pywebview.api.clear_source_paths();
+      renderSelectedFiles(summary);
+    } catch (e) {
+      showToast('Error clearing: ' + e, 'error');
+    }
+  });
+
+  btnStartSend.addEventListener('click', async () => {
+    await startSendingFiles();
+  });
+
+  // Receiver Incoming Offer Buttons
+  const btnOfferAccept = document.getElementById('btnOfferAccept');
+  const btnOfferReject = document.getElementById('btnOfferReject');
+  const btnOfferBrowseDest = document.getElementById('btnOfferBrowseDest');
+
+  btnOfferBrowseDest.addEventListener('click', async () => {
+    try {
+      const res = await window.pywebview.api.select_destination_folder();
+      if (res && res.path) {
+        document.getElementById('offerDestInput').value = res.path;
+      }
+    } catch (e) {
+      showToast('Error selecting destination: ' + e, 'error');
+    }
+  });
+
+  btnOfferAccept.addEventListener('click', async () => {
+    const dest = document.getElementById('offerDestInput').value.trim();
+    if (!dest) {
+      showToast('Please select destination directory', 'error');
+      return;
+    }
+    try {
+      const res = await window.pywebview.api.accept_transfer(dest, 'keep_both');
+      if (res && res.success) {
+        setSharingState(3); // Transition to State 3!
+      } else {
+        showToast(res.error || 'Failed to accept transfer', 'error');
+      }
+    } catch (e) {
+      showToast('Accept error: ' + e, 'error');
+    }
+  });
+
+  btnOfferReject.addEventListener('click', async () => {
+    try {
+      await window.pywebview.api.reject_transfer('User declined in dialog');
+      document.getElementById('state2IncomingOfferBox').classList.add('hidden');
+      showToast('Transfer request declined', 'info');
+    } catch (e) {
+      showToast('Reject error: ' + e, 'error');
+    }
+  });
+}
+
+function initDeviceConnectionView() {
+  const badge = document.getElementById('state2SelectedBadge');
+  const desc = document.getElementById('manualModeDesc');
+  const groupPort = document.getElementById('groupManualPort');
+  const helperBox = document.getElementById('ethernetHelperBox');
+  const lblIp = document.getElementById('lblManualIp');
+  const inputIp = document.getElementById('inputManualIp');
+
+  badge.textContent = `Selected: ${selectedAction} + ${selectedMethod}`;
+
+  // Role Action Deck (Show Send Deck or Receive Deck)
+  document.getElementById('roleSendActionDeck').classList.toggle('active', selectedAction === 'SEND');
+  document.getElementById('roleReceiveActionDeck').classList.toggle('active', selectedAction === 'RECEIVE');
+
+  // Connection Medium Customization
+  if (selectedMethod === 'WIFI') {
+    desc.textContent = 'Enter the target device Wi-Fi IP address and receiver port.';
+    lblIp.textContent = 'Target Wi-Fi IP Address:';
+    inputIp.placeholder = '192.168.1.x';
+    groupPort.classList.remove('hidden');
+    helperBox.classList.add('hidden');
+  } else if (selectedMethod === 'ETHERNET') {
+    desc.textContent = 'Enter the direct Ethernet IP address (192.168.123.x) or setup cable interface.';
+    lblIp.textContent = 'Target Ethernet IP Address:';
+    inputIp.placeholder = '192.168.123.1';
+    groupPort.classList.remove('hidden');
+    helperBox.classList.remove('hidden');
+  } else if (selectedMethod === 'BLE') {
+    desc.textContent = 'Enter the target Bluetooth device identifier or MAC address.';
+    lblIp.textContent = 'Target BLE Identifier:';
+    inputIp.placeholder = 'TSHARE-DEVICE-ID or MAC';
+    groupPort.classList.add('hidden');
+    helperBox.classList.add('hidden');
+  }
+
+  // Load existing source files summary if Send
+  if (selectedAction === 'SEND') {
+    window.pywebview.api.get_source_paths().then(renderSelectedFiles).catch(() => {});
+  }
+}
+
+async function performManualConnection() {
+  const ip = document.getElementById('inputManualIp').value.trim();
+  const port = parseInt(document.getElementById('inputManualPort').value, 10) || 52001;
+  const banner = document.getElementById('connValidationBanner');
+  const bannerTitle = document.getElementById('connStatusTitle');
+  const bannerMsg = document.getElementById('connStatusMsg');
+
+  if (!ip) {
+    showToast('Please enter target IP address or identifier', 'error');
+    return;
+  }
+
+  banner.classList.remove('hidden', 'success', 'error');
+  bannerTitle.textContent = 'Connecting...';
+  bannerMsg.textContent = `Validating ${selectedMethod} connection to ${ip}...`;
+
+  try {
+    const res = await window.pywebview.api.connect_device(ip, port, selectedMethod.toLowerCase());
+    if (res && res.success) {
+      banner.classList.add('success');
+      bannerTitle.textContent = 'Connected';
+      bannerMsg.textContent = `Connection verified with target (${res.medium.toUpperCase()})`;
+      connectedDevice = { ip, port, medium: res.medium };
+      showToast(`Connected to ${ip}:${port}`, 'success');
+    } else {
+      banner.classList.add('error');
+      bannerTitle.textContent = 'Connection Failed';
+      bannerMsg.textContent = res.error || 'Could not reach target device';
+      connectedDevice = null;
+    }
+  } catch (e) {
+    banner.classList.add('error');
+    bannerTitle.textContent = 'Connection Error';
+    bannerMsg.textContent = String(e);
+    connectedDevice = null;
+  }
+}
+
+async function triggerDeviceScan() {
+  const statusText = document.getElementById('discoveryStatusText');
+  const dot = document.getElementById('discoveryDot');
+  const list = document.getElementById('discoveredDevicesList');
+
+  statusText.textContent = 'Searching for devices...';
+  dot.classList.add('pulse-dot');
+  list.innerHTML = '<div class="device-placeholder">Scanning local network for TShare peers...</div>';
+
+  try {
+    const peers = await window.pywebview.api.get_discovered_peers();
+    if (!peers || peers.length === 0) {
+      list.innerHTML = '<div class="device-placeholder">No devices discovered yet. Ensure peer is running TShare.</div>';
+      statusText.textContent = 'Scan idle (0 devices found)';
+      return;
+    }
+
+    list.innerHTML = '';
+    peers.forEach(peer => {
+      const card = document.createElement('div');
+      card.className = 'device-card-item';
+      card.innerHTML = `
+        <div class="device-info-left">
+          <span class="device-info-name">${peer.hostname || 'TShare Peer'}</span>
+          <span class="device-info-meta">${peer.ip}:${peer.port || 52001} · ${peer.medium || 'Wire'}</span>
+        </div>
+        <button class="btn-primary btn-sm btn-select-peer" data-ip="${peer.ip}" data-port="${peer.port || 52001}">
+          SELECT
+        </button>
+      `;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('.btn-select-peer').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const ip = e.target.getAttribute('data-ip');
+        const port = e.target.getAttribute('data-port');
+        document.getElementById('inputManualIp').value = ip;
+        document.getElementById('inputManualPort').value = port;
+        connectedDevice = { ip, port: parseInt(port, 10), medium: selectedMethod.toLowerCase() };
+        showToast(`Selected device: ${ip}`, 'success');
+      });
+    });
+
+    statusText.textContent = `Found ${peers.length} active device(s)`;
+  } catch (e) {
+    statusText.textContent = 'Scan error';
+    list.innerHTML = `<div class="device-placeholder text-danger">Discovery error: ${e}</div>`;
+  }
+}
+
+function renderSelectedFiles(summary) {
+  const countEl = document.getElementById('state2FilesCount');
+  const bytesEl = document.getElementById('state2FilesBytes');
+  const listEl = document.getElementById('state2FileList');
+
+  if (!summary) return;
+
+  countEl.textContent = `${summary.count || 0} Files Selected`;
+  bytesEl.textContent = formatBytes(summary.total_bytes || 0);
+
+  if (!summary.items || summary.items.length === 0) {
+    listEl.innerHTML = '<div class="file-placeholder">No files chosen. Click Select Files or Select Folder.</div>';
+    return;
+  }
+
+  listEl.innerHTML = '';
+  summary.items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'file-item-row';
+    row.innerHTML = `
+      <div class="file-item-name" title="${item.path}">
+        <strong>${item.name}</strong> ${item.is_dir ? '(Folder)' : `(${formatBytes(item.size)})`}
+      </div>
+      <button class="btn-icon btn-remove-file" data-idx="${idx}" title="Remove file">✕</button>
+    `;
+    listEl.appendChild(row);
+  });
+
+  listEl.querySelectorAll('.btn-remove-file').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const idx = parseInt(e.target.getAttribute('data-idx'), 10);
+      try {
+        const updated = await window.pywebview.api.remove_source_path(idx);
+        renderSelectedFiles(updated);
+      } catch (err) {
+        showToast('Error removing file: ' + err, 'error');
+      }
+    });
+  });
+}
+
+async function startSendingFiles() {
+  const ip = document.getElementById('inputManualIp').value.trim();
+  const port = parseInt(document.getElementById('inputManualPort').value, 10) || 52001;
+  const hashMode = document.getElementById('state2HashModeSelect').value;
+
+  if (!ip) {
+    showToast('Please specify target IP or select device', 'error');
+    return;
+  }
+
+  try {
+    const res = await window.pywebview.api.start_transfer(ip, port, hashMode);
+    if (res && res.success) {
+      showToast(`Transfer initialized (${hashMode.toUpperCase()} mode)`, 'success');
+      setSharingState(3); // Transition to State 3!
+    } else {
+      showToast(res.error || 'Failed to start transfer', 'error');
+    }
+  } catch (e) {
+    showToast('Transfer start error: ' + e, 'error');
+  }
+}
+
+// --------------------------------------------------------
+// STATE 3: TRANSFER MONITORING DASHBOARD
+// --------------------------------------------------------
+function setupTransferDashboardStage() {
+  const btnCancel = document.getElementById('btnCancelActiveTransfer');
+  const btnReturn = document.getElementById('btnReturnToSelection');
+  const btnCompleteReturn = document.getElementById('btnCompleteReturn');
+  const btnClearLogs = document.getElementById('btnClearDashLogs');
+
+  btnCancel.addEventListener('click', async () => {
+    try {
+      await window.pywebview.api.cancel_active_transfer();
+      showToast('Transfer cancel requested', 'info');
+    } catch (e) {
+      showToast('Cancel error: ' + e, 'error');
+    }
+  });
+
+  function doReturnToSelection() {
+    // Reset back to State 1
+    selectedAction = null;
+    selectedMethod = null;
+    connectedDevice = null;
+    document.querySelectorAll('.rotary-node').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.mirror-item').forEach(m => m.classList.remove('active'));
+    document.getElementById('btnConfirmSelection').disabled = true;
+    document.getElementById('transferCompleteBanner').classList.add('hidden');
+    document.getElementById('btnReturnToSelection').classList.add('hidden');
+    setSharingState(1);
+  }
+
+  btnReturn.addEventListener('click', doReturnToSelection);
+  btnCompleteReturn.addEventListener('click', doReturnToSelection);
+
+  btnClearLogs.addEventListener('click', () => {
+    const panel = document.getElementById('dashLogPanel');
+    if (panel) panel.innerHTML = '<div class="log-line text-dim">Logs cleared.</div>';
+  });
+}
+
+// ========================================================
+// 4. TELEMETRY POLLING & DIAL UPDATES
+// ========================================================
+async function pollAppTelemetry() {
   try {
     const data = await window.pywebview.api.get_dashboard_telemetry();
     if (!data) return;
 
-    const hw = data.hardware;
-    const transfer = data.transfer;
-    const role = data.active_role;
+    const hw = data.hardware || {};
+    const transfer = data.transfer || {};
+    const role = data.active_role || 'none';
 
-    // 1. Hardware Overview Cards
-    if (hw) {
-      if (hw.network && hw.network.primary_ip) {
-        document.getElementById('telemetryIp').textContent = hw.network.primary_ip;
-      }
-      if (hw.disk) {
-        document.getElementById('telemetryDiskFree').textContent = `${hw.disk.free_gb} GB Free`;
-        document.getElementById('telemetryDiskBar').style.width = `${hw.disk.percent_used}%`;
-      }
-      if (hw.cpu) {
-        document.getElementById('telemetryCpu').textContent = `${hw.cpu.percent}% (${hw.cpu.cores} Cores)`;
-      }
-      if (hw.ram) {
-        document.getElementById('telemetryRam').textContent = `${hw.ram.available_gb} GB / ${hw.ram.total_gb} GB`;
-      }
-    }
+    // Update HOME hardware cards
+    const homeIp = document.getElementById('homeHwIp');
+    const homeDisk = document.getElementById('homeHwDisk');
+    const homeCpu = document.getElementById('homeHwCpu');
+    const homeRam = document.getElementById('homeHwRam');
 
-    // 2. Incoming Offer on Receiver
-    if (transfer && transfer.pending_offer) {
-      showIncomingOffer(transfer.pending_offer);
-    } else {
-      hideIncomingOffer();
-    }
+    if (homeIp) homeIp.textContent = hw.primary_ip || '127.0.0.1';
+    if (homeDisk) homeDisk.textContent = `${hw.free_disk_gb || 0} GB Free`;
+    if (homeCpu) homeCpu.textContent = `${hw.cpu_percent || 0}% (${hw.cpu_count || 1} Cores)`;
+    if (homeRam) homeRam.textContent = `${hw.used_ram_gb || 0} GB / ${hw.total_ram_gb || 0} GB`;
 
-    // 3. Active Transfer vs Idle
-    const isTransferActive = (role !== 'none') && (transfer.status === 'streaming' || transfer.status === 'receiving' || transfer.status === 'connecting');
+    // Update Speed & Progress in HOME tab
+    const homeSpeedVal = document.getElementById('homeSpeedVal');
+    const homeSpeedStatus = document.getElementById('homeSpeedStatus');
+    const homeProgressPct = document.getElementById('homeProgressPct');
+    const homeProgressBar = document.getElementById('homeProgressBar');
+    const homeProgressBytes = document.getElementById('homeProgressBytes');
+    const homeActiveFile = document.getElementById('homeActiveFile');
 
-    if (isTransferActive) {
-      if (activeTab !== 'home' && !window._redirectedForTransfer) {
-        switchTab('home');
-        window._redirectedForTransfer = true;
-      }
+    const liveSpeed = transfer.speed_mbps || 0;
+    const totalBytes = transfer.total_bytes || 0;
+    const transBytes = transfer.transferred_bytes || 0;
+    const pct = totalBytes > 0 ? Math.min(100, Math.round((transBytes / totalBytes) * 100)) : 0;
 
-      document.getElementById('homeActiveTransfer').classList.remove('hidden');
-      document.getElementById('homeHardwareView').classList.add('hidden');
-
-      document.getElementById('transferRoleBadge').textContent = (role === 'sender') ? 'TRANSMITTING (SENDER)' : 'RECEIVING (RECEIVER)';
-      document.getElementById('liveSpeedNumber').textContent = transfer.speed_mbps ? transfer.speed_mbps.toFixed(1) : '0.0';
-      document.getElementById('livePeerText').textContent = `${transfer.peer_name || 'Peer'} (${transfer.peer_ip || ''})`;
-
-      // Integrity Mode Display
-      const hashLabel = (transfer.hash_mode === 'sha256') ? 'SHA-256 (Crypto)' : ((transfer.hash_mode === 'none') ? 'Disabled (Turbo Raw)' : 'CRC32 (Fast Stream)');
-      document.getElementById('liveIntegrityText').textContent = hashLabel;
-
-      if (transfer.eta_seconds && transfer.eta_seconds > 0) {
-        const mins = Math.floor(transfer.eta_seconds / 60);
-        const secs = transfer.eta_seconds % 60;
-        document.getElementById('liveEtaText').textContent = `${mins}m ${secs}s`;
+    if (homeSpeedVal) homeSpeedVal.textContent = liveSpeed.toFixed(1);
+    if (homeSpeedStatus) {
+      if (role !== 'none') {
+        homeSpeedStatus.textContent = `${role.toUpperCase()}: Streaming data · ETA: ${formatDuration(transfer.eta_seconds)}`;
       } else {
-        document.getElementById('liveEtaText').textContent = '--:--';
-      }
-
-      const transGB = (transfer.transferred_bytes / (1024 ** 3)).toFixed(2);
-      const totalGB = (transfer.total_bytes / (1024 ** 3)).toFixed(2);
-      document.getElementById('liveTransferredText').textContent = `${transGB} GB / ${totalGB} GB`;
-
-      const pct = transfer.total_bytes > 0 ? Math.min(100, Math.round((transfer.transferred_bytes / transfer.total_bytes) * 100)) : 0;
-      document.getElementById('liveOverallPct').textContent = `${pct}%`;
-      document.getElementById('liveOverallBar').style.width = `${pct}%`;
-
-      document.getElementById('liveActiveFileTitle').textContent = `File [${transfer.current_file_index || 1}/${transfer.total_files || 1}]: ${transfer.current_file_name || 'Streaming...'}`;
-      document.getElementById('liveStatusSubtext').textContent = (role === 'sender') ? (transfer.receiver_status || 'Streaming blocks...') : 'Receiving & verifying chunks...';
-
-    } else {
-      window._redirectedForTransfer = false;
-      document.getElementById('homeActiveTransfer').classList.add('hidden');
-      document.getElementById('homeHardwareView').classList.remove('hidden');
-
-      const resumeAlert = document.getElementById('disconnectedResumeAlert');
-      if (data.can_resume) {
-        resumeAlert.classList.remove('hidden');
-      } else {
-        resumeAlert.classList.add('hidden');
+        homeSpeedStatus.textContent = 'Idle · No active wire activity';
       }
     }
 
-    // 4. Update Discovered Peers
-    updateDiscoveredPeers();
+    if (homeProgressPct) homeProgressPct.textContent = `${pct}%`;
+    if (homeProgressBar) homeProgressBar.style.width = `${pct}%`;
+    if (homeProgressBytes) homeProgressBytes.textContent = `${formatBytes(transBytes)} / ${formatBytes(totalBytes)}`;
+    if (homeActiveFile) {
+      homeActiveFile.textContent = transfer.current_file_name ? `File: ${transfer.current_file_name}` : 'File: Ready';
+    }
+
+    // Update Transfer Log in HOME tab & State 3 panel
+    updateLogsView();
+
+    // Update State 3 Gauges & Progress Bar
+    if (currentSharingState === 3) {
+      updateState3Dashboard(transfer, role, hw);
+    }
+
+    // Check for incoming receiver offer
+    if (transfer.status === 'waiting_user' && transfer.pending_offer) {
+      renderIncomingOffer(transfer.pending_offer);
+    }
 
   } catch (err) {
-    console.error('Telemetry error:', err);
+    // console.warn('Telemetry error:', err);
   }
 }
 
-// ----------------- DIRECT CABLE CONTROLS -----------------
+function updateState3Dashboard(transfer, role, hw) {
+  const speedNum = document.getElementById('dashSpeedNum');
+  const speedCircle = document.getElementById('dialSpeedCircle');
+  const cpuNum = document.getElementById('dashCpuNum');
+  const cpuCircle = document.getElementById('dialCpuCircle');
+  const etaText = document.getElementById('dashEtaText');
+  const roleBadge = document.getElementById('dashRoleBadge');
+  const statusBadge = document.getElementById('dashStatusBadge');
+  const integrityBadge = document.getElementById('dashIntegrityBadge');
+  const progPct = document.getElementById('dashProgressPct');
+  const progFill = document.getElementById('dashProgressFill');
+  const fileName = document.getElementById('dashCurrentFileName');
+  const byteText = document.getElementById('dashTransferredBytes');
+  const completeBanner = document.getElementById('transferCompleteBanner');
+  const btnReturn = document.getElementById('btnReturnToSelection');
 
-function setupWireControls() {
-  // Medium selector
-  const btnEth = document.getElementById('btnModeEthernet');
-  const btnWifi = document.getElementById('btnModeWifi');
-  if (btnEth && btnWifi) {
-    btnEth.addEventListener('click', () => {
-      btnEth.classList.add('active');
-      btnWifi.classList.remove('active');
-      selectedMedium = 'ethernet';
-    });
-    btnWifi.addEventListener('click', () => {
-      btnWifi.classList.add('active');
-      btnEth.classList.remove('active');
-      selectedMedium = 'wifi';
-    });
+  const speed = transfer.speed_mbps || 0;
+  const cpu = hw.cpu_percent || 0;
+  const total = transfer.total_bytes || 0;
+  const transferred = transfer.transferred_bytes || 0;
+  const pct = total > 0 ? Math.min(100, Math.round((transferred / total) * 100)) : 0;
+
+  // Speed Dial Ring: max dial is 125 MB/s (Gigabit wire speed)
+  // Circumference = 2 * PI * 68 = ~427
+  const maxSpeed = 125;
+  const speedRatio = Math.min(1, speed / maxSpeed);
+  const speedOffset = 427 - (427 * speedRatio);
+  if (speedNum) speedNum.textContent = speed.toFixed(1);
+  if (speedCircle) speedCircle.style.strokeDashoffset = speedOffset;
+  if (etaText) etaText.textContent = formatDuration(transfer.eta_seconds);
+
+  // CPU Dial Ring: 0-100%
+  const cpuRatio = Math.min(1, cpu / 100);
+  const cpuOffset = 427 - (427 * cpuRatio);
+  if (cpuNum) cpuNum.textContent = `${Math.round(cpu)}%`;
+  if (cpuCircle) cpuCircle.style.strokeDashoffset = cpuOffset;
+
+  // Badges
+  if (roleBadge) roleBadge.textContent = role === 'receiver' ? 'RECEIVER' : 'SENDER';
+  if (statusBadge) statusBadge.textContent = (transfer.status || 'STREAMING').toUpperCase();
+  if (integrityBadge) integrityBadge.textContent = `${(transfer.hash_mode || 'CRC32').toUpperCase()} MODE`;
+
+  // Progress Bar
+  if (progPct) progPct.textContent = `${pct}%`;
+  if (progFill) progFill.style.width = `${pct}%`;
+  if (fileName) {
+    fileName.textContent = transfer.current_file_name ? `File [${transfer.current_file_index || 1}/${transfer.total_files || 1}]: ${transfer.current_file_name}` : 'Ready';
   }
+  if (byteText) byteText.textContent = `${formatBytes(transferred)} / ${formatBytes(total)}`;
 
-  // File & folder selectors
-  document.getElementById('btnPickFiles').addEventListener('click', async () => {
-    const res = await window.pywebview.api.select_source_files();
-    updateSourceSummary(res);
-  });
+  // Completion
+  if (transfer.status === 'completed') {
+    completeBanner.classList.remove('hidden');
+    btnReturn.classList.remove('hidden');
+    document.getElementById('completeTitle').textContent = 'Transfer Completed Successfully';
+    document.getElementById('completeDesc').textContent = `Transferred ${transfer.total_files || 0} files (${formatBytes(total)}) with ${transfer.hash_mode || 'CRC32'} verification.`;
+  } else if (transfer.status === 'error') {
+    completeBanner.classList.remove('hidden');
+    btnReturn.classList.remove('hidden');
+    document.getElementById('completeTitle').textContent = 'Transfer Encountered Error';
+    document.getElementById('completeDesc').textContent = transfer.error_message || 'Connection interrupted';
+  }
+}
 
-  document.getElementById('btnPickFolder').addEventListener('click', async () => {
-    const res = await window.pywebview.api.select_source_folder();
-    updateSourceSummary(res);
-  });
+async function updateLogsView() {
+  try {
+    const logs = await window.pywebview.api.get_transfer_logs();
+    if (!logs || !Array.isArray(logs)) return;
 
-  // Destination folder selector
-  document.getElementById('btnPickDestination').addEventListener('click', async () => {
-    const res = await window.pywebview.api.select_destination_folder();
-    if (res && res.path) {
-      document.getElementById('destinationPathInput').value = res.path;
+    const homeFeed = document.getElementById('homeLogFeed');
+    const dashFeed = document.getElementById('dashLogPanel');
+
+    const logHtml = logs.map(l => `<div class="log-line">${l}</div>`).join('');
+
+    if (homeFeed && homeFeed.children.length !== logs.length) {
+      homeFeed.innerHTML = logHtml;
+      homeFeed.scrollTop = homeFeed.scrollHeight;
     }
-  });
 
-  // Start Transfer
-  document.getElementById('btnStartTransfer').addEventListener('click', async () => {
-    const manualIp = document.getElementById('manualIpInput').value.trim();
-    const manualPort = parseInt(document.getElementById('manualPortInput').value.trim()) || 52001;
-    const targetIp = selectedTargetIp || manualIp;
-
-    if (!targetIp) {
-      alert('Please enter a target IP address or select a discovered peer.');
-      return;
+    if (dashFeed && dashFeed.children.length !== logs.length) {
+      dashFeed.innerHTML = logHtml;
+      dashFeed.scrollTop = dashFeed.scrollHeight;
     }
+  } catch (e) {
+    // Suppress log polling errors
+  }
+}
 
-    const hashMode = document.getElementById('selHashMode').value;
-    const res = await window.pywebview.api.start_transfer(targetIp, manualPort, hashMode);
-    if (!res.success) {
-      alert(`Transfer failed to start: ${res.error}`);
+function renderIncomingOffer(offer) {
+  const panel = document.getElementById('state2IncomingOfferBox');
+  const banner = document.getElementById('offerNotification');
+
+  if (offer) {
+    document.getElementById('offerPeerName').textContent = offer.peer_name || 'Unknown';
+    document.getElementById('offerPeerIp').textContent = offer.peer_ip || '127.0.0.1';
+    document.getElementById('offerFilesCount').textContent = offer.total_files || 0;
+    document.getElementById('offerTotalSize').textContent = formatBytes(offer.total_bytes || 0);
+
+    // If currently on State 2 and Action is Receive, show prompt box
+    if (currentSharingState === 2 && selectedAction === 'RECEIVE') {
+      panel.classList.remove('hidden');
     } else {
-      switchTab('home');
+      // Show top floating notification banner across other pages
+      banner.classList.remove('hidden');
+      document.getElementById('offerTitle').textContent = `Transfer Offer from ${offer.peer_name}`;
+      document.getElementById('offerSubtitle').textContent = `${offer.total_files} files (${formatBytes(offer.total_bytes)})`;
     }
-  });
-
-  // Copy Receiver Address
-  document.getElementById('btnCopyReceiverAddress').addEventListener('click', () => {
-    const addr = document.getElementById('receiverAddressPill').textContent;
-    navigator.clipboard.writeText(addr);
-    alert(`Copied to clipboard: ${addr}`);
-  });
-
-  // Emergency Cancel & Resume
-  document.getElementById('btnEmergencyCancel').addEventListener('click', () => {
-    window.pywebview.api.cancel_active_transfer();
-  });
-
-  document.getElementById('btnResumeTransfer').addEventListener('click', () => {
-    window.pywebview.api.resume_transfer();
-  });
-
-  document.getElementById('btnHomeResume').addEventListener('click', () => {
-    window.pywebview.api.resume_transfer();
-  });
-
-  // Offer Banner Actions
-  document.getElementById('btnBannerAccept').addEventListener('click', async () => {
-    const dest = document.getElementById('destinationPathInput').value.trim();
-    const policy = document.getElementById('collisionPolicySelect').value;
-    if (!dest) {
-      alert('Please select a destination folder first in the Direct Cable tab.');
-      switchTab('wire');
-      return;
-    }
-    await window.pywebview.api.accept_transfer(dest, policy);
-    hideIncomingOffer();
-    switchTab('home');
-  });
-
-  document.getElementById('btnBannerDecline').addEventListener('click', async () => {
-    await window.pywebview.api.reject_transfer("Declined by receiver user");
-    hideIncomingOffer();
-  });
-}
-
-function updateSourceSummary(res) {
-  if (!res) return;
-  const countEl = document.getElementById('selectedSourcesCount');
-  const bytesEl = document.getElementById('selectedSourcesBytes');
-  if (res.count > 0) {
-    countEl.textContent = `${res.count} item(s) selected`;
-    bytesEl.textContent = `${res.total_mb} MB`;
   } else {
-    countEl.textContent = 'No files or folder selected';
-    bytesEl.textContent = '0 MB';
+    panel.classList.add('hidden');
+    banner.classList.add('hidden');
   }
 }
 
-async function loadNetworkPill() {
-  try {
-    const info = await window.pywebview.api.get_my_network_info();
-    if (!info) return;
+// ========================================================
+// 5. FILE SERVER TAB
+// ========================================================
+function setupFileServerTab() {
+  const btnToggle = document.getElementById('btnToggleServer');
+  const btnOpenBrowser = document.getElementById('btnOpenServerBrowser');
+  const btnCopy = document.getElementById('btnCopyServerUrl');
+  const btnChangeShared = document.getElementById('btnChangeSharedFolder');
+  const btnChangeUploads = document.getElementById('btnChangeUploadsFolder');
+  const chkUploads = document.getElementById('chkServerAllowUploads');
 
-    const pill = document.getElementById('receiverAddressPill');
-    if (pill) pill.textContent = info.display_address;
-
-    const destInput = document.getElementById('destinationPathInput');
-    if (destInput && !destInput.value) {
-      const defDest = await window.pywebview.api.select_destination_folder();
-      if (defDest && defDest.path) destInput.value = defDest.path;
+  btnToggle.addEventListener('click', async () => {
+    const isRunning = btnToggle.textContent.includes('STOP');
+    try {
+      const res = await window.pywebview.api.toggle_web_portal(!isRunning);
+      if (res && res.success) {
+        refreshFileServerInfo();
+        showToast(isRunning ? 'Server stopped' : 'Server started', 'info');
+      }
+    } catch (e) {
+      showToast('Server toggle error: ' + e, 'error');
     }
-  } catch (e) {}
-}
-
-async function updateDiscoveredPeers() {
-  try {
-    const peers = await window.pywebview.api.get_discovered_peers();
-    const box = document.getElementById('peerList');
-    if (!box) return;
-
-    if (!peers || peers.length === 0) {
-      box.innerHTML = '<div class="peer-placeholder">Searching for peers via UDP broadcast...</div>';
-      return;
-    }
-
-    box.innerHTML = '';
-    peers.forEach(p => {
-      const card = document.createElement('div');
-      card.className = `peer-card ${selectedTargetIp === p.ip ? 'active' : ''}`;
-      card.innerHTML = `
-        <div>
-          <div class="peer-name">${p.name}</div>
-          <div style="font-size: 11px; color: var(--text-dim);">${p.medium === 'wire_locked' ? '🔒 Wire Locked' : p.medium}</div>
-        </div>
-        <span class="peer-ip-badge">${p.ip}:${p.port}</span>
-      `;
-      card.onclick = () => {
-        selectedTargetIp = p.ip;
-        selectedTargetPort = p.port;
-        document.getElementById('manualIpInput').value = p.ip;
-        document.getElementById('manualPortInput').value = p.port;
-        document.querySelectorAll('.peer-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-
-        const wireBanner = document.getElementById('wireLockBanner');
-        if (p.wire_locked) wireBanner.classList.remove('hidden');
-        else wireBanner.classList.add('hidden');
-      };
-      box.appendChild(card);
-    });
-  } catch (e) {}
-}
-
-function showIncomingOffer(offer) {
-  currentPendingOffer = offer;
-  const banner = document.getElementById('offerNotification');
-  const title = document.getElementById('offerTitle');
-  const sub = document.getElementById('offerSubtitle');
-
-  const sizeGB = (offer.total_bytes / (1024 ** 3)).toFixed(2);
-  title.textContent = `Incoming Transfer from ${offer.peer_name}`;
-  sub.textContent = `${offer.total_files} file(s) · ${sizeGB} GB · ${offer.hash_mode.toUpperCase()} mode`;
-  banner.classList.remove('hidden');
-}
-
-function hideIncomingOffer() {
-  currentPendingOffer = null;
-  const banner = document.getElementById('offerNotification');
-  if (banner) banner.classList.add('hidden');
-}
-
-// ----------------- LAN WEB PORTAL CONTROLS -----------------
-
-function setupPortalControls() {
-  document.getElementById('btnCopyPortalUrl').addEventListener('click', () => {
-    const url = document.getElementById('portalUrlText').textContent;
-    navigator.clipboard.writeText(url);
-    alert(`Copied URL: ${url}`);
   });
 
-  document.getElementById('btnOpenPortalBrowser').addEventListener('click', () => {
-    const url = document.getElementById('portalUrlText').textContent;
+  btnCopy.addEventListener('click', () => {
+    const url = document.getElementById('serverUrlText').textContent;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Server URL copied to clipboard', 'success');
+    });
+  });
+
+  btnOpenBrowser.addEventListener('click', () => {
+    const url = document.getElementById('serverUrlText').textContent;
     window.open(url, '_blank');
   });
 
-  document.getElementById('btnSelectPortalSharedFolder').addEventListener('click', async () => {
-    const res = await window.pywebview.api.select_portal_shared_folder();
-    if (res && res.folder) {
-      document.getElementById('portalSharedFolderInput').value = res.folder;
+  btnChangeShared.addEventListener('click', async () => {
+    try {
+      const res = await window.pywebview.api.select_portal_shared_folder();
+      if (res && res.success) {
+        document.getElementById('serverSharedFolderInput').value = res.folder;
+        showToast('Shared folder updated', 'success');
+      }
+    } catch (e) {
+      showToast('Error selecting folder: ' + e, 'error');
     }
   });
 
-  document.getElementById('btnSelectPortalUploadsFolder').addEventListener('click', async () => {
-    const res = await window.pywebview.api.select_portal_uploads_folder();
-    if (res && res.folder) {
-      document.getElementById('portalUploadsFolderInput').value = res.folder;
+  btnChangeUploads.addEventListener('click', async () => {
+    try {
+      const res = await window.pywebview.api.select_portal_uploads_folder();
+      if (res && res.success) {
+        document.getElementById('serverUploadsFolderInput').value = res.folder;
+        showToast('Uploads destination updated', 'success');
+      }
+    } catch (e) {
+      showToast('Error selecting folder: ' + e, 'error');
     }
   });
 
-  document.getElementById('chkPortalAllowUploads').addEventListener('change', async (e) => {
-    await window.pywebview.api.set_portal_allow_uploads(e.target.checked);
+  chkUploads.addEventListener('change', async (e) => {
+    try {
+      await window.pywebview.api.set_portal_allow_uploads(e.target.checked);
+      showToast(e.target.checked ? 'Guest uploads enabled' : 'Guest uploads disabled', 'info');
+    } catch (err) {
+      showToast('Error changing upload setting: ' + err, 'error');
+    }
   });
 }
 
-async function loadPortalStatus() {
+async function refreshFileServerInfo() {
   try {
     const status = await window.pywebview.api.get_web_portal_status();
     if (!status) return;
 
-    document.getElementById('portalUrlText').textContent = status.portal_url;
-    document.getElementById('portalSharedFolderInput').value = status.shared_folder;
-    document.getElementById('portalUploadsFolderInput').value = status.uploads_folder;
-    document.getElementById('chkPortalAllowUploads').checked = status.allow_uploads;
+    const badge = document.getElementById('serverStatusBadge');
+    const btnToggle = document.getElementById('btnToggleServer');
+    const urlText = document.getElementById('serverUrlText');
+    const ipPortText = document.getElementById('serverIpPortText');
+    const sharedInput = document.getElementById('serverSharedFolderInput');
+    const uploadsInput = document.getElementById('serverUploadsFolderInput');
+    const qrContainer = document.getElementById('serverQrContainer');
+
+    const running = status.running;
+    badge.textContent = running ? 'RUNNING' : 'STOPPED';
+    badge.className = `portal-status-badge ${running ? 'active' : ''}`;
+    btnToggle.textContent = running ? 'STOP SERVER' : 'START SERVER';
+    btnToggle.className = running ? 'btn-danger' : 'btn-primary';
+
+    urlText.textContent = status.portal_url || `http://127.0.0.1:${status.port}/portal`;
+    ipPortText.textContent = `${status.ip} : ${status.port}`;
+    sharedInput.value = status.shared_folder || '';
+    uploadsInput.value = status.uploads_folder || '';
 
     // Load QR SVG
     const qrSvg = await window.pywebview.api.get_portal_qr_svg();
-    const qrBox = document.getElementById('portalQrContainer');
-    if (qrBox && qrSvg) {
-      qrBox.innerHTML = qrSvg;
+    if (qrContainer && qrSvg) {
+      qrContainer.innerHTML = qrSvg;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('File Server refresh error:', e);
+  }
 }
 
-// ----------------- VERIFY & AUDIT CONTROLS -----------------
+// ========================================================
+// 6. VERIFY TAB (Dedicated Pairwise File Verification)
+// ========================================================
+function setupVerifyTab() {
+  const btnPickOrig = document.getElementById('btnPickOriginalFile');
+  const btnPickRecv = document.getElementById('btnPickReceivedFile');
+  const btnVerify = document.getElementById('btnDoVerifyFiles');
+  const inputOrig = document.getElementById('verifyOriginalPath');
+  const inputRecv = document.getElementById('verifyReceivedPath');
+  const origSizeTag = document.getElementById('verifyOriginalSize');
+  const recvSizeTag = document.getElementById('verifyReceivedSize');
+  const resultCard = document.getElementById('verifyResultCard');
 
-function setupVerifyControls() {
-  const btnAudit = document.getElementById('btnRunAudit');
-  btnAudit.addEventListener('click', async () => {
-    if (!selectedVerifySessionId) return;
-    const mode = document.querySelector('input[name="auditMode"]:checked').value;
-    btnAudit.disabled = true;
-
-    const res = await window.pywebview.api.start_verification(selectedVerifySessionId, mode);
-    if (!res.success) {
-      alert(`Audit failed to start: ${res.error}`);
-      btnAudit.disabled = false;
-    } else {
-      pollAuditTelemetry();
-    }
-  });
-}
-
-async function loadVerifyLedgers() {
-  try {
-    const data = await window.pywebview.api.get_verify_ledger();
-    const box = document.getElementById('verifySessionList');
-    box.innerHTML = '';
-
-    const allSessions = [
-      ...(data.receiver_sessions || []),
-      ...(data.sender_sessions || []),
-      ...(data.portal_sessions || [])
-    ];
-
-    if (allSessions.length === 0) {
-      box.innerHTML = '<div class="session-placeholder">No completed transfer sessions found to audit.</div>';
-      return;
-    }
-
-    allSessions.forEach(s => {
-      const item = document.createElement('div');
-      item.className = `session-item ${selectedVerifySessionId === s.session_id ? 'selected' : ''}`;
-      const sizeMB = (s.total_bytes / (1024 * 1024)).toFixed(1);
-      item.innerHTML = `
-        <div>
-          <div class="session-title">[${s.role.toUpperCase()}] ${s.peer_name || 'Transfer'}</div>
-          <div class="session-meta">Files: ${s.total_files} · Size: ${sizeMB} MB · Date: ${s.created_at}</div>
-        </div>
-        <span class="status-badge ${s.status}">${s.status}</span>
-      `;
-      item.onclick = () => {
-        selectedVerifySessionId = s.session_id;
-        document.querySelectorAll('.session-item').forEach(i => i.classList.remove('selected'));
-        item.classList.add('selected');
-        document.getElementById('btnRunAudit').disabled = false;
-      };
-      box.appendChild(item);
-    });
-  } catch (e) {}
-}
-
-async function pollAuditTelemetry() {
-  const auditTimer = setInterval(async () => {
+  btnPickOrig.addEventListener('click', async () => {
     try {
-      const data = await window.pywebview.api.get_verify_telemetry();
-      if (!data) return;
-
-      document.getElementById('auditStatusBadge').textContent = data.status.toUpperCase();
-      document.getElementById('auditStatusBadge').className = `audit-status-badge ${data.status}`;
-      document.getElementById('auditSpeedText').textContent = `${data.read_speed_mbps} MB/s`;
-      document.getElementById('auditFileText').textContent = data.current_file || 'Auditing files...';
-
-      const pct = data.total_bytes > 0 ? Math.min(100, Math.round((data.bytes_checked / data.total_bytes) * 100)) : 0;
-      document.getElementById('auditBar').style.width = `${pct}%`;
-
-      if (data.details) {
-        document.getElementById('auditDetailsText').textContent = data.details;
-      }
-
-      if (data.status === 'passed' || data.status === 'mismatch' || data.status === 'error') {
-        clearInterval(auditTimer);
-        document.getElementById('btnRunAudit').disabled = false;
+      const res = await window.pywebview.api.select_file_for_verify('Select Original File');
+      if (res && res.success) {
+        inputOrig.value = res.path;
+        origSizeTag.textContent = `${res.name} (${formatBytes(res.size)})`;
       }
     } catch (e) {
-      clearInterval(auditTimer);
-      document.getElementById('btnRunAudit').disabled = false;
+      showToast('Error selecting file: ' + e, 'error');
     }
-  }, 300);
-}
+  });
 
-// ----------------- HISTORY CONTROLS -----------------
+  btnPickRecv.addEventListener('click', async () => {
+    try {
+      const res = await window.pywebview.api.select_file_for_verify('Select Received File');
+      if (res && res.success) {
+        inputRecv.value = res.path;
+        recvSizeTag.textContent = `${res.name} (${formatBytes(res.size)})`;
+      }
+    } catch (e) {
+      showToast('Error selecting file: ' + e, 'error');
+    }
+  });
 
-function setupHistoryControls() {
-  document.getElementById('btnRefreshHistory').addEventListener('click', loadHistory);
-}
+  btnVerify.addEventListener('click', async () => {
+    const origPath = inputOrig.value.trim();
+    const recvPath = inputRecv.value.trim();
 
-async function loadHistory() {
-  try {
-    const list = await window.pywebview.api.get_history();
-    const tbody = document.getElementById('historyTableBody');
-    tbody.innerHTML = '';
-
-    if (!list || list.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="loading-td">No transfer records found.</td></tr>';
+    if (!origPath || !recvPath) {
+      showToast('Please select both the Original File and Received File', 'error');
       return;
     }
 
-    list.forEach(item => {
+    btnVerify.disabled = true;
+    btnVerify.textContent = 'Calculating SHA-256...';
+    resultCard.classList.add('hidden');
+
+    try {
+      const res = await window.pywebview.api.verify_two_files(origPath, recvPath);
+      btnVerify.disabled = false;
+      btnVerify.textContent = '[ VERIFY ]';
+
+      if (!res || !res.success) {
+        showToast(res.error || 'Verification failed', 'error');
+        return;
+      }
+
+      resultCard.classList.remove('hidden');
+      const badge = document.getElementById('verifyResultBadge');
+      const origHashEl = document.getElementById('verifyOriginalHash');
+      const recvHashEl = document.getElementById('verifyReceivedHash');
+      const durationEl = document.getElementById('verifyDurationText');
+      const verdictEl = document.getElementById('verifyParityVerdict');
+
+      origHashEl.textContent = res.original_hash || '--';
+      recvHashEl.textContent = res.received_hash || '--';
+      durationEl.textContent = `Time Elapsed: ${res.duration_sec}s · Size: ${formatBytes(res.original_size)}`;
+
+      if (res.match) {
+        badge.textContent = 'RESULT: MATCH';
+        badge.className = 'result-badge match';
+        verdictEl.textContent = 'Bit-for-bit cryptographic parity confirmed. Both hashes match identically.';
+      } else {
+        badge.textContent = 'RESULT: MISMATCH';
+        badge.className = 'result-badge mismatch';
+        verdictEl.textContent = 'Cryptographic mismatch detected! The received file differs from the original source.';
+      }
+
+      showToast(`Verification completed: ${res.match ? 'MATCH' : 'MISMATCH'}`, res.match ? 'success' : 'error');
+    } catch (e) {
+      btnVerify.disabled = false;
+      btnVerify.textContent = '[ VERIFY ]';
+      showToast('Verification error: ' + e, 'error');
+    }
+  });
+
+  const btnRefreshPast = document.getElementById('btnRefreshPastSessions');
+  if (btnRefreshPast) {
+    btnRefreshPast.addEventListener('click', loadPastAuditSessions);
+  }
+}
+
+async function loadPastAuditSessions() {
+  const tbody = document.getElementById('verifySessionsTableBody');
+  if (!tbody) return;
+
+  try {
+    const history = await window.pywebview.api.get_history();
+    if (!history || history.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="loading-td">No transfer sessions recorded yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = '';
+    history.forEach(item => {
       const tr = document.createElement('tr');
-      const sizeMB = (item.total_bytes / (1024 * 1024)).toFixed(1);
       tr.innerHTML = `
-        <td>${item.created_at || 'Recently'}</td>
-        <td><strong>${item.role.toUpperCase()}</strong></td>
-        <td>${item.peer_name || 'Local'} (${item.peer_ip || '127.0.0.1'})</td>
-        <td>${item.total_files}</td>
-        <td>${sizeMB} MB</td>
-        <td>${item.avg_speed_mbps} MB/s</td>
-        <td><span class="badge-v3">${(item.hash_mode || 'crc32').toUpperCase()}</span></td>
-        <td><span class="status-badge ${item.status}">${item.status}</span></td>
-        <td><button class="btn-secondary btn-sm" onclick="openFolder('${escapeJs(item.local_path || '')}')">Open Folder</button></td>
+        <td><code>#${item.session_id}</code></td>
+        <td><span class="role-badge">${(item.role || 'sender').toUpperCase()}</span></td>
+        <td>${item.peer_name || 'Peer'}</td>
+        <td>${item.total_files || 1}</td>
+        <td>${formatBytes(item.total_bytes || 0)}</td>
+        <td>${(item.hash_mode || 'crc32').toUpperCase()}</td>
+        <td><span class="status-badge-active">${(item.status || 'OK').toUpperCase()}</span></td>
+        <td>
+          <button class="btn-secondary btn-sm btn-audit-session" data-session="${item.session_id}">
+            Audit SHA-256
+          </button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
-  } catch (e) {}
+
+    tbody.querySelectorAll('.btn-audit-session').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const sId = e.target.getAttribute('data-session');
+        try {
+          const res = await window.pywebview.api.start_verification(sId, 'full_crypto');
+          if (res && res.success) {
+            showToast(`Cryptographic audit started for Session #${sId}`, 'success');
+          } else {
+            showToast(res.error || 'Could not start audit', 'error');
+          }
+        } catch (err) {
+          showToast('Audit error: ' + err, 'error');
+        }
+      });
+    });
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="loading-td text-danger">Error loading history: ${e}</td></tr>`;
+  }
 }
 
-function openFolder(path) {
-  if (path) window.pywebview.api.open_folder(path);
-}
+// ========================================================
+// 7. SETTINGS TAB
+// ========================================================
+function setupSettingsTab() {
+  loadSettings();
 
-// ----------------- SETTINGS & AUTH MODAL -----------------
-
-function setupSettingsControls() {
+  const btnSave = document.getElementById('btnSaveSettings');
   const rngRam = document.getElementById('rngRamBuffer');
   const lblRam = document.getElementById('lblRamBuffer');
-  rngRam.addEventListener('input', () => { lblRam.textContent = `${rngRam.value} MB`; });
+  const rngBandwidth = document.getElementById('rngBandwidth');
+  const lblBandwidth = document.getElementById('lblBandwidth');
 
-  const rngBw = document.getElementById('rngBandwidth');
-  const lblBw = document.getElementById('lblBandwidth');
-  rngBw.addEventListener('input', () => {
-    lblBw.textContent = (rngBw.value == 0) ? 'Uncapped (Max Wire Speed)' : `${rngBw.value} Mbps`;
-  });
+  if (rngRam && lblRam) {
+    rngRam.addEventListener('input', () => {
+      lblRam.textContent = `${rngRam.value} MB`;
+    });
+  }
 
-  document.getElementById('btnSaveSettings').addEventListener('click', async () => {
-    const newSettings = {
-      use_full_resources: document.getElementById('chkFullResources').checked,
-      default_hash_mode: document.getElementById('cfgDefaultHashMode').value,
-      ram_buffer_mb: parseInt(rngRam.value),
-      bandwidth_limit_mbps: parseInt(rngBw.value)
-    };
-    await window.pywebview.api.save_settings(newSettings);
-    alert('Settings saved successfully!');
-  });
+  if (rngBandwidth && lblBandwidth) {
+    rngBandwidth.addEventListener('input', () => {
+      const val = parseInt(rngBandwidth.value, 10);
+      lblBandwidth.textContent = val === 0 ? 'Uncapped (Max Wire Speed)' : `${val} MB/s`;
+    });
+  }
 
-  document.getElementById('btnSetupEthernet').addEventListener('click', async () => {
-    const res = await window.pywebview.api.configure_ethernet("");
-    if (res.need_password) {
-      showAuthModal();
-    } else {
-      document.getElementById('netSetupStatus').textContent = res.message || res.error;
-    }
-  });
+  if (btnSave) {
+    btnSave.addEventListener('click', async () => {
+      const cfg = {
+        use_full_resources: document.getElementById('chkFullResources').checked,
+        default_hash_mode: document.getElementById('cfgDefaultHashMode').value,
+        ram_buffer_mb: parseInt(rngRam.value, 10),
+        bandwidth_limit_mbps: parseInt(rngBandwidth.value, 10)
+      };
+      try {
+        await window.pywebview.api.save_settings(cfg);
+        showToast('Application settings saved', 'success');
+      } catch (e) {
+        showToast('Error saving settings: ' + e, 'error');
+      }
+    });
+  }
 
-  document.getElementById('btnRevertEthernet').addEventListener('click', async () => {
-    const res = await window.pywebview.api.revert_ethernet();
-    document.getElementById('netSetupStatus').textContent = res.message || res.error;
-  });
+  // Network Auto-Setup & Revert
+  const btnSetupEth = document.getElementById('btnSetupEthernet');
+  const btnRevertEth = document.getElementById('btnRevertEthernet');
+
+  if (btnSetupEth) {
+    btnSetupEth.addEventListener('click', async () => {
+      try {
+        const res = await window.pywebview.api.configure_ethernet('');
+        if (res.requires_sudo) {
+          openAuthModal();
+        } else if (res.success) {
+          showToast('Direct cable interface configured (192.168.123.x)', 'success');
+          document.getElementById('netSetupStatus').textContent = 'Direct Cable IP: 192.168.123.x active.';
+        } else {
+          showToast(res.error || 'Setup failed', 'error');
+        }
+      } catch (e) {
+        showToast('Setup error: ' + e, 'error');
+      }
+    });
+  }
+
+  if (btnRevertEth) {
+    btnRevertEth.addEventListener('click', async () => {
+      try {
+        await window.pywebview.api.revert_ethernet();
+        showToast('Network settings reverted to DHCP/Link-Local', 'info');
+        document.getElementById('netSetupStatus').textContent = 'Network settings reverted to normal state.';
+      } catch (e) {
+        showToast('Revert error: ' + e, 'error');
+      }
+    });
+  }
+
+  // Destination Settings Buttons
+  const btnPickDest = document.getElementById('btnSettingsPickDest');
+  const btnSaveDest = document.getElementById('btnSettingsSaveDest');
+  const inputDest = document.getElementById('settingsDestInput');
+
+  if (btnPickDest) {
+    btnPickDest.addEventListener('click', async () => {
+      try {
+        const res = await window.pywebview.api.select_destination_folder();
+        if (res && res.path) inputDest.value = res.path;
+      } catch (e) {
+        showToast('Error selecting destination: ' + e, 'error');
+      }
+    });
+  }
+
+  if (btnSaveDest) {
+    btnSaveDest.addEventListener('click', async () => {
+      const p = inputDest.value.trim();
+      if (!p) return;
+      try {
+        const res = await window.pywebview.api.save_default_destination(p);
+        if (res && res.success) {
+          showToast('Default destination updated', 'success');
+          loadHomeDefaultDestination();
+        }
+      } catch (e) {
+        showToast('Error saving destination: ' + e, 'error');
+      }
+    });
+  }
 }
 
 async function loadSettings() {
   try {
     const s = await window.pywebview.api.get_settings();
     if (!s) return;
-    document.getElementById('chkFullResources').checked = s.use_full_resources;
-    document.getElementById('cfgDefaultHashMode').value = s.default_hash_mode || 'crc32';
-    document.getElementById('rngRamBuffer').value = s.ram_buffer_mb || 512;
-    document.getElementById('lblRamBuffer').textContent = `${s.ram_buffer_mb || 512} MB`;
-    document.getElementById('rngBandwidth').value = s.bandwidth_limit_mbps || 0;
-    document.getElementById('lblBandwidth').textContent = (s.bandwidth_limit_mbps == 0) ? 'Uncapped (Max Wire Speed)' : `${s.bandwidth_limit_mbps} Mbps`;
-  } catch (e) {}
-}
 
-function setupAuthModalControls() {
-  document.getElementById('btnCancelAuth').addEventListener('click', hideAuthModal);
-  document.getElementById('btnConfirmAuth').addEventListener('click', async () => {
-    const pass = document.getElementById('authPasswordInput').value;
-    const res = await window.pywebview.api.configure_ethernet(pass);
-    if (!res.success) {
-      const err = document.getElementById('authErrorMsg');
-      err.textContent = res.error || 'Authentication failed';
-      err.classList.remove('hidden');
-    } else {
-      hideAuthModal();
-      document.getElementById('netSetupStatus').textContent = res.message;
+    if (document.getElementById('chkFullResources')) {
+      document.getElementById('chkFullResources').checked = Boolean(s.use_full_resources);
     }
-  });
+    if (document.getElementById('cfgDefaultHashMode')) {
+      document.getElementById('cfgDefaultHashMode').value = s.default_hash_mode || 'crc32';
+    }
+    if (document.getElementById('rngRamBuffer')) {
+      document.getElementById('rngRamBuffer').value = s.ram_buffer_mb || 512;
+      document.getElementById('lblRamBuffer').textContent = `${s.ram_buffer_mb || 512} MB`;
+    }
+    if (document.getElementById('rngBandwidth')) {
+      const bw = s.bandwidth_limit_mbps || 0;
+      document.getElementById('rngBandwidth').value = bw;
+      document.getElementById('lblBandwidth').textContent = bw === 0 ? 'Uncapped (Max Wire Speed)' : `${bw} MB/s`;
+    }
+
+    const platform = await window.pywebview.api.get_system_platform();
+    const platEl = document.getElementById('settingsPlatformText');
+    if (platEl && platform) {
+      platEl.textContent = `${platform} (Python 3 Engine)`;
+    }
+  } catch (e) {
+    console.error('Failed to load settings:', e);
+  }
 }
 
-function showAuthModal() {
-  document.getElementById('authPasswordInput').value = '';
-  document.getElementById('authErrorMsg').classList.add('hidden');
-  document.getElementById('authModal').classList.remove('hidden');
-}
+// ========================================================
+// 8. SUDO PASSWORD MODAL
+// ========================================================
+function openAuthModal() {
+  const modal = document.getElementById('authModal');
+  const input = document.getElementById('authPasswordInput');
+  const err = document.getElementById('authErrorMsg');
+  const btnCancel = document.getElementById('btnCancelAuth');
+  const btnConfirm = document.getElementById('btnConfirmAuth');
 
-function hideAuthModal() {
-  document.getElementById('authModal').classList.add('hidden');
-}
+  modal.classList.remove('hidden');
+  input.value = '';
+  err.classList.add('hidden');
+  input.focus();
 
-function escapeJs(str) {
-  return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  btnCancel.onclick = () => modal.classList.add('hidden');
+
+  btnConfirm.onclick = async () => {
+    const pwd = input.value;
+    try {
+      const res = await window.pywebview.api.configure_ethernet(pwd);
+      if (res && res.success) {
+        modal.classList.add('hidden');
+        showToast('Ethernet adapter configured with direct IP (192.168.123.x)', 'success');
+      } else {
+        err.textContent = res.error || 'Authentication failed';
+        err.classList.remove('hidden');
+      }
+    } catch (e) {
+      err.textContent = String(e);
+      err.classList.remove('hidden');
+    }
+  };
 }

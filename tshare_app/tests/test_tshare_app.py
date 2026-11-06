@@ -202,6 +202,81 @@ class TestTShareUnified(unittest.TestCase):
         self.assertIn("<svg", svg)
         self.assertIn("Finder Pattern", svg)
 
+    def test_07_verify_two_files_pairwise(self):
+        verifier = VerifyEngine()
+        with tempfile.TemporaryDirectory() as td:
+            f1 = os.path.join(td, "orig.bin")
+            f2 = os.path.join(td, "copy.bin")
+            f3 = os.path.join(td, "corrupt.bin")
+
+            data = os.urandom(1024 * 1024)
+            with open(f1, "wb") as f:
+                f.write(data)
+            with open(f2, "wb") as f:
+                f.write(data)
+            with open(f3, "wb") as f:
+                f.write(data + b"different")
+
+            # 1. Matching pair
+            res_match = verifier.verify_two_files(f1, f2)
+            self.assertTrue(res_match["success"])
+            self.assertTrue(res_match["match"])
+            self.assertEqual(res_match["status"], "MATCH")
+            self.assertEqual(res_match["original_hash"], res_match["received_hash"])
+
+            # 2. Mismatching pair
+            res_mismatch = verifier.verify_two_files(f1, f3)
+            self.assertTrue(res_mismatch["success"])
+            self.assertFalse(res_mismatch["match"])
+            self.assertEqual(res_mismatch["status"], "MISMATCH")
+            self.assertNotEqual(res_mismatch["original_hash"], res_mismatch["received_hash"])
+
+    def test_08_event_logging(self):
+        sender = TransferEngine()
+        sender.log_event("Testing sender log entry")
+        logs = sender.get_logs()
+        self.assertTrue(len(logs) >= 2)
+        self.assertIn("Testing sender log entry", logs[-1])
+
+        recv = ReceiverEngine(port=52099)
+        recv.log_event("Testing receiver log entry")
+        r_logs = recv.get_logs()
+        self.assertTrue(len(r_logs) >= 2)
+        self.assertIn("Testing receiver log entry", r_logs[-1])
+
+    def test_09_bridge_apis(self):
+        from backend.bridge import BridgeAPI
+        bridge = BridgeAPI()
+        with tempfile.TemporaryDirectory() as td:
+            # Test default destination saving
+            dest_res = bridge.save_default_destination(td)
+            self.assertTrue(dest_res["success"])
+            self.assertEqual(dest_res["path"], td)
+
+            get_dest = bridge.get_default_destination()
+            self.assertEqual(get_dest["path"], td)
+
+            # Test source file management
+            f1 = os.path.join(td, "file1.txt")
+            f2 = os.path.join(td, "file2.txt")
+            with open(f1, "w") as f:
+                f.write("A")
+            with open(f2, "w") as f:
+                f.write("B")
+
+            set_res = bridge.set_source_paths([f1, f2])
+            self.assertEqual(set_res["count"], 2)
+
+            rem_res = bridge.remove_source_path(0)
+            self.assertEqual(rem_res["count"], 1)
+
+            clear_res = bridge.clear_source_paths()
+            self.assertEqual(clear_res["count"], 0)
+
+            # Test logs retrieval
+            logs = bridge.get_transfer_logs()
+            self.assertIsInstance(logs, list)
+
 
 if __name__ == "__main__":
     unittest.main()

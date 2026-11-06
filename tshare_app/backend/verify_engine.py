@@ -41,6 +41,51 @@ class VerifyEngine:
         self._cancel_requested = True
         self.status = "cancelled"
 
+    def verify_two_files(self, original_path: str, received_path: str) -> Dict[str, Any]:
+        """Calculates SHA-256 for two files and compares them for exact parity."""
+        orig_clean = os.path.abspath(original_path.strip().strip('"').strip("'"))
+        recv_clean = os.path.abspath(received_path.strip().strip('"').strip("'"))
+
+        if not os.path.isfile(orig_clean):
+            return {"success": False, "error": f"Original file does not exist: {orig_clean}"}
+        if not os.path.isfile(recv_clean):
+            return {"success": False, "error": f"Received file does not exist: {recv_clean}"}
+
+        start_time = time.time()
+        orig_size = os.path.getsize(orig_clean)
+        recv_size = os.path.getsize(recv_clean)
+
+        orig_hasher = hashlib.sha256()
+        with open(orig_clean, "rb") as f:
+            while chunk := f.read(BLOCK_SIZE):
+                orig_hasher.update(chunk)
+        orig_digest = orig_hasher.hexdigest()
+
+        recv_hasher = hashlib.sha256()
+        with open(recv_clean, "rb") as f:
+            while chunk := f.read(BLOCK_SIZE):
+                recv_hasher.update(chunk)
+        recv_digest = recv_hasher.hexdigest()
+
+        duration = max(0.001, time.time() - start_time)
+        match = (orig_digest.lower() == recv_digest.lower())
+
+        return {
+            "success": True,
+            "match": match,
+            "status": "MATCH" if match else "MISMATCH",
+            "original_path": orig_clean,
+            "original_name": os.path.basename(orig_clean),
+            "original_hash": orig_digest,
+            "original_size": orig_size,
+            "received_path": recv_clean,
+            "received_name": os.path.basename(recv_clean),
+            "received_hash": recv_digest,
+            "received_size": recv_size,
+            "duration_sec": round(duration, 3)
+        }
+
+
     def start_verification(
         self,
         session_id: str,

@@ -57,11 +57,26 @@ class ReceiverEngine:
         self.eta_seconds = 0
         self.active_destination = ""
         self.error_message = ""
+        self._logs: List[str] = [f"{time.strftime('%H:%M:%S')}  Receiver listener initialized"]
 
         # Callbacks
         self.on_offer: Optional[Callable[[Dict[str, Any]], None]] = None
         self.on_progress: Optional[Callable[[Dict[str, Any]], None]] = None
         self.on_status_change: Optional[Callable[[str], None]] = None
+
+    def log_event(self, msg: str) -> None:
+        """Appends a timestamped log entry."""
+        entry = f"{time.strftime('%H:%M:%S')}  {msg}"
+        self._logs.append(entry)
+        if len(self._logs) > 500:
+            self._logs.pop(0)
+
+    def get_logs(self) -> List[str]:
+        return list(self._logs)
+
+    def clear_logs(self) -> None:
+        self._logs.clear()
+        self.log_event("Receiver logs cleared")
 
     def start(self) -> None:
         """Starts TCP listener daemon."""
@@ -180,6 +195,7 @@ class ReceiverEngine:
 
         try:
             # 1. Receive MSG_HELLO
+            self.log_event(f"Incoming connection from {self.peer_ip}:{addr[1]}")
             msg_type, session_id, hello_data = recv_json(sock)
             if msg_type != MSG_HELLO:
                 send_json(sock, MSG_ERROR, 0, {"error": "Expected MSG_HELLO"})
@@ -187,6 +203,7 @@ class ReceiverEngine:
 
             self.current_session_id = session_id
             self.peer_name = hello_data.get("hostname", "Unknown")
+            self.log_event(f"Peer identified: {self.peer_name}")
 
             send_json(sock, MSG_HELLO_ACK, session_id, {
                 "accepted": True,
@@ -204,6 +221,7 @@ class ReceiverEngine:
             self.hash_mode = manifest.get("hash_mode", "crc32")
             self.transferred_bytes = 0
             files = manifest.get("files", [])
+            self.log_event(f"Manifest received: {self.total_files} files ({round(self.total_bytes / (1024*1024), 2)} MB)")
 
             # Present offer to user & wait for decision
             self.pending_offer = {
@@ -216,6 +234,7 @@ class ReceiverEngine:
                 "root_name": files[0].get("rel_path", "Transfer").split("/")[0] if files else "Transfer"
             }
             self.status = "waiting_user"
+            self.log_event("Waiting for user approval...")
             if self.on_offer:
                 self.on_offer(self.pending_offer)
 
@@ -226,10 +245,13 @@ class ReceiverEngine:
                 send_json(sock, MSG_REJECT, session_id, {"reason": reason})
                 self.status = "idle"
                 self.pending_offer = None
+                self.log_event(f"Transfer declined: {reason}")
                 return
 
             destination_dir = self._user_decision["destination_dir"]
             collision_policy = self._user_decision["collision_policy"]
+            self.active_destination = destination_dir
+            self.log_event(f"Transfer accepted. Destination: {destination_dir}")
 
             send_json(sock, MSG_ACCEPT, session_id, {
                 "accepted": True,
@@ -238,6 +260,7 @@ class ReceiverEngine:
 
             self.status = "receiving"
             self.pending_offer = None
+            self.log_event("Receiving data stream...")
 
             last_speed_time = time.time()
             last_speed_bytes = 0
@@ -425,6 +448,7 @@ class ReceiverEngine:
                                     os.remove(state_path)
                                 except Exception:
                                     pass
+                            self.log_event(f"File verified and saved [{self.current_file_index}/{self.total_files}]: {self.current_file_name}")
 
             # Receive MSG_SESSION_DONE
             if not self._cancel_requested:
@@ -437,6 +461,7 @@ class ReceiverEngine:
                 avg_speed = (self.transferred_bytes / duration) / (1024 * 1024)
 
                 self.status = "completed"
+                self.log_event(f"Transfer completed: {self.total_files} files ({round(self.total_bytes / (1024*1024), 2)} MB) received in {round(duration, 1)}s (Avg {round(avg_speed, 1)} MB/s)")
                 self.history_db.record_transfer(
                     session_id=str(session_id),
                     role="receiver",
@@ -453,10 +478,12 @@ class ReceiverEngine:
                 )
             else:
                 self.status = "cancelled"
+                self.log_event("Transfer cancelled")
 
         except Exception as e:
             self.status = "error"
             self.error_message = str(e)
+            self.log_event(f"Receiver error: {e}")
         finally:
             self._transfer_active = False
             try:

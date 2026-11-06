@@ -48,9 +48,24 @@ class TransferEngine:
         self.eta_seconds = 0
         self.error_message = ""
         self.receiver_status_message = ""
+        self._logs: List[str] = [f"{time.strftime('%H:%M:%S')}  Transfer engine initialized"]
 
         # Resource configuration
         self.rate_limit_mbps = 0.0  # 0 = uncapped
+
+    def log_event(self, msg: str) -> None:
+        """Appends a timestamped log entry."""
+        entry = f"{time.strftime('%H:%M:%S')}  {msg}"
+        self._logs.append(entry)
+        if len(self._logs) > 500:
+            self._logs.pop(0)
+
+    def get_logs(self) -> List[str]:
+        return list(self._logs)
+
+    def clear_logs(self) -> None:
+        self._logs.clear()
+        self.log_event("Logs cleared")
 
     def is_active(self) -> bool:
         return self.status in ["connecting", "negotiating", "streaming"]
@@ -170,6 +185,8 @@ class TransferEngine:
         self.status = "connecting"
         self.error_message = ""
         self.receiver_status_message = "Connecting to peer..."
+        self.log_event("Transfer initialized")
+        self.log_event(f"Connecting to peer at {self.target_ip}:{self.target_port}...")
 
         try:
             # 1. Connect TCP socket (Wire Binding when target is on direct cable)
@@ -192,6 +209,7 @@ class TransferEngine:
             sock.connect((self.target_ip, self.target_port))
             tune_socket(sock)
             self._sock = sock
+            self.log_event("TCP connection established")
 
             # 2. Handshake HELLO
             self.status = "negotiating"
@@ -207,12 +225,14 @@ class TransferEngine:
 
             self.peer_name = ack_data.get("name", "Receiver")
             self.receiver_status_message = f"Connected to {self.peer_name} · Preparing manifest..."
+            self.log_event(f"Device verified: {self.peer_name}")
 
             # 3. Build & Send Manifest
             files, total_size = self._build_manifest(self.source_paths)
             self.total_files = len(files)
             self.total_bytes = total_size
             self.transferred_bytes = 0
+            self.log_event(f"Manifest created: {self.total_files} files ({round(self.total_bytes / (1024*1024), 2)} MB)")
 
             clean_files = [
                 {"id": f["id"], "rel_path": f["rel_path"], "size": f["size"], "mtime": f["mtime"]}
@@ -227,16 +247,20 @@ class TransferEngine:
             })
 
             self.receiver_status_message = f"Awaiting peer acceptance..."
+            self.log_event("Awaiting receiver approval...")
             msg_type, _, decision = recv_json(sock)
 
             if msg_type != MSG_ACCEPT or not decision.get("accepted"):
                 reason = decision.get("reason", "Peer declined transfer") if decision else "Declined"
                 self.receiver_status_message = f"Transfer declined: {reason}"
                 self.status = "rejected"
+                self.log_event(f"Transfer declined by peer: {reason}")
                 return
 
             self.receiver_status_message = f"Receiver accepted · streaming ({self.hash_mode.upper()} mode)"
             self.status = "streaming"
+            self.log_event(f"Receiver accepted transfer (Integrity: {self.hash_mode.upper()})")
+            self.log_event("File transfer started")
 
             # 4. Stream 4 MB Blocks
             sock.settimeout(30.0)
@@ -302,12 +326,14 @@ class TransferEngine:
                 if not self._cancel_requested:
                     send_json(sock, MSG_FILE_DONE, session_id, {"file_id": file_id})
                     msg_type, _, file_resp = recv_json(sock)
+                    self.log_event(f"File sent [{self.current_file_index}/{self.total_files}]: {self.current_file_name}")
 
                     # Handle selective retransmission if any block was missing or corrupt
                     while msg_type == MSG_FILE_DONE and file_resp and file_resp.get("status") == "retry":
                         missing_blocks = file_resp.get("missing_blocks", [])
                         if not missing_blocks or self._cancel_requested:
                             break
+                        self.log_event(f"Retransmitting {len(missing_blocks)} blocks for {self.current_file_name}")
                         with open(abs_path, "rb", buffering=4 * 1024 * 1024) as f:
                             for b_idx in missing_blocks:
                                 b_len = min(BLOCK_SIZE, file_size - (b_idx * BLOCK_SIZE))
@@ -330,6 +356,7 @@ class TransferEngine:
 
                 self.status = "completed"
                 self.receiver_status_message = "Transfer completed successfully"
+                self.log_event(f"Transfer completed: {self.total_files} files ({round(self.total_bytes / (1024*1024), 2)} MB) in {round(duration, 1)}s (Avg {round(avg_speed, 1)} MB/s)")
 
                 # Record in history database
                 first_src = self.source_paths[0] if self.source_paths else ""
@@ -350,11 +377,13 @@ class TransferEngine:
             else:
                 self.status = "cancelled"
                 self.receiver_status_message = "Transfer cancelled"
+                self.log_event("Transfer cancelled by user")
 
         except Exception as e:
             self.status = "error"
             self.error_message = str(e)
             self.receiver_status_message = f"Error: {e}"
+            self.log_event(f"Transfer error: {e}")
         finally:
             if self._sock:
                 try:

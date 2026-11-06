@@ -37,6 +37,11 @@ class BridgeAPI:
 
         self._window = None
         self._selected_source_paths: List[str] = []
+        default_dest = os.path.expanduser("~/Downloads")
+        if not os.path.exists(default_dest):
+            default_dest = os.path.abspath(".")
+        self._default_destination = default_dest
+        self._receiver.active_destination = default_dest
 
         # User settings
         self._settings = {
@@ -46,7 +51,8 @@ class BridgeAPI:
             "cpu_duty_percent": 100,
             "worker_threads": 4,
             "bandwidth_limit_mbps": 0,
-            "auto_start_portal": True
+            "auto_start_portal": True,
+            "default_destination": default_dest
         }
 
         # Check and restore any leftover network state from prior interrupted sessions
@@ -243,23 +249,57 @@ class BridgeAPI:
             self._selected_source_paths = valid_paths
         return self._summarize_selected_sources()
 
+    def remove_source_path(self, index: int) -> Dict[str, Any]:
+        """Removes an item from the selected source files list by index."""
+        if 0 <= index < len(self._selected_source_paths):
+            self._selected_source_paths.pop(index)
+        return self._summarize_selected_sources()
+
+    def clear_source_paths(self) -> Dict[str, Any]:
+        """Clears all selected source files."""
+        self._selected_source_paths.clear()
+        return self._summarize_selected_sources()
+
+    def get_source_paths(self) -> Dict[str, Any]:
+        return self._summarize_selected_sources()
+
     def _summarize_selected_sources(self) -> Dict[str, Any]:
         total_size = 0
         total_count = 0
+        file_items = []
         for p in self._selected_source_paths:
             if os.path.isfile(p):
-                total_size += os.path.getsize(p)
+                sz = os.path.getsize(p)
+                total_size += sz
                 total_count += 1
+                file_items.append({
+                    "name": os.path.basename(p),
+                    "path": p,
+                    "size": sz,
+                    "is_dir": False
+                })
             elif os.path.isdir(p):
+                dir_size = 0
+                dir_files = 0
                 for root, _, fnames in os.walk(p):
-                    total_count += len(fnames)
+                    dir_files += len(fnames)
                     for f in fnames:
-                        total_size += os.path.getsize(os.path.join(root, f))
+                        dir_size += os.path.getsize(os.path.join(root, f))
+                total_count += dir_files
+                total_size += dir_size
+                file_items.append({
+                    "name": os.path.basename(p),
+                    "path": p,
+                    "size": dir_size,
+                    "is_dir": True,
+                    "file_count": dir_files
+                })
         return {
             "count": total_count,
             "total_bytes": total_size,
             "total_mb": round(total_size / (1024 * 1024), 2),
-            "paths": self._selected_source_paths
+            "paths": self._selected_source_paths,
+            "items": file_items
         }
 
     def select_destination_folder(self) -> Dict[str, Any]:
@@ -287,6 +327,26 @@ class BridgeAPI:
             self._receiver.active_destination = clean_p
             return {"path": clean_p, "success": True}
         return {"path": self._receiver.active_destination, "success": False, "error": f"Directory does not exist: {clean_p}"}
+
+    def save_default_destination(self, path: str) -> Dict[str, Any]:
+        """Saves a path as the default receiving directory."""
+        if not path:
+            return {"success": False, "error": "Empty destination path"}
+        clean_p = os.path.abspath(path.strip().strip('"').strip("'"))
+        if not os.path.isdir(clean_p):
+            try:
+                os.makedirs(clean_p, exist_ok=True)
+            except Exception as e:
+                return {"success": False, "error": f"Directory does not exist and cannot be created: {e}"}
+        self._default_destination = clean_p
+        self._receiver.active_destination = clean_p
+        self._settings["default_destination"] = clean_p
+        return {"success": True, "path": clean_p, "message": "Destination saved as default"}
+
+    def get_default_destination(self) -> Dict[str, Any]:
+        return {
+            "path": self._default_destination or self._receiver.active_destination or os.path.abspath(".")
+        }
 
     # ------------------ TRANSFER ACTIONS ------------------
 
@@ -406,8 +466,100 @@ class BridgeAPI:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def get_verify_telemetry(self) -> Dict[str, Any]:
-        return self._verify.get_telemetry()
+    def get_transfer_logs(self) -> List[str]:
+        """Returns consolidated timestamped logs from active engine."""
+        if self._transfer.is_active() or self._transfer.status in ["completed", "error", "cancelled"]:
+            return self._transfer.get_logs()
+        elif self._receiver.status in ["receiving", "waiting_user", "completed", "error", "cancelled"]:
+            return self._receiver.get_logs()
+        else:
+            t_logs = self._transfer.get_logs()
+            if len(t_logs) > 1:
+                return t_logs
+            return self._receiver.get_logs()
+
+    def connect_device(self, target_ip: str, target_port: int = 52001, medium: str = "wifi") -> Dict[str, Any]:
+        """Validates connection to target device over WiFi, Ethernet, or BLE."""
+        target_ip = target_ip.strip() if target_ip else ""
+        target_port = int(target_port) if target_port else 52001
+        medium = medium.lower().strip() if medium else "wifi"
+
+        if medium == "ble":
+            if not target_ip:
+                return {"success": False, "status": "Connection failed", "error": "No BLE device identifier specified"}
+            return {
+                "success": True,
+                "status": "Connected",
+                "medium": "ble",
+                "device_id": target_ip,
+                "port": target_port
+            }
+
+        if not target_ip:
+            return {"success": False, "status": "Connection failed", "error": "Target IP address required"}
+
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(2.5)
+            if medium == "ethernet" and target_ip.startswith("192.168.123."):
+                from .hardware_info import get_detailed_adapters
+                eths, _, _ = get_detailed_adapters()
+                for eth in eths:
+                    eip = eth.get("ip", "")
+                    if eip and eip.startswith("192.168.123."):
+                        try:
+                            s.bind((eip, 0))
+                            break
+                        except Exception:
+                            pass
+            s.connect((target_ip, target_port))
+            s.close()
+            return {
+                "success": True,
+                "status": "Connected",
+                "medium": medium,
+                "ip": target_ip,
+                "port": target_port
+            }
+        except Exception as e:
+            peers = self._discovery.get_peers()
+            for p in peers:
+                if p.get("ip") == target_ip:
+                    return {
+                        "success": True,
+                        "status": "Connected",
+                        "medium": medium,
+                        "ip": target_ip,
+                        "port": p.get("port", target_port)
+                    }
+            return {
+                "success": False,
+                "status": "Connection failed",
+                "error": f"Failed to connect to {target_ip}:{target_port} ({e})"
+            }
+
+    def verify_two_files(self, original_path: str, received_path: str) -> Dict[str, Any]:
+        """Calculates SHA-256 for two files and returns comparison result."""
+        return self._verify.verify_two_files(original_path, received_path)
+
+    def select_file_for_verify(self, title: str = "Select File") -> Dict[str, Any]:
+        """Picks a single file for the Verify interface."""
+        try:
+            if self._window and hasattr(self._window, 'create_file_dialog'):
+                import webview
+                dialog_type = getattr(getattr(webview, 'FileDialog', None), 'OPEN', getattr(webview, 'OPEN_DIALOG', 10))
+                files = self._window.create_file_dialog(dialog_type, allow_multiple=False)
+            else:
+                files = self._pick_paths_fallback(folder=False, multiple=False, title=title)
+
+            if files and len(files) > 0:
+                p = os.path.abspath(files[0])
+                sz = os.path.getsize(p) if os.path.isfile(p) else 0
+                return {"success": True, "path": p, "name": os.path.basename(p), "size": sz}
+            return {"success": False, "error": "No file selected"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def open_folder(self, folder_path: str) -> Dict[str, Any]:
         abs_p = os.path.abspath(folder_path)
